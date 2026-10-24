@@ -26,12 +26,39 @@ from sim.pareto import pareto_ranks as _pareto_ranks
 _SCORERS = {}  # type: Dict[str, object]
 
 
-def _default_plugin(scorer_id: str) -> object:
-    if scorer_id == "fin_v1":
-        from sim.plugins.fin_v1 import PLUGIN
+# Built-in scorers that a fresh interpreter can rebuild by import alone.
+# Anything else reaches sim/ only through register_scorer() (for example the
+# backend's ScorerBridge), which exists in the registering process and nowhere
+# else — so it can be evaluated, but never in a spawned worker.
+_BUILTIN_SCORERS = {
+    "fin_v1": "sim.plugins.fin_v1",
+}  # type: Dict[str, str]
 
-        return PLUGIN
-    raise KeyError("unknown scorer: %s" % scorer_id)
+
+def _default_plugin(scorer_id: str) -> object:
+    module_path = _BUILTIN_SCORERS.get(scorer_id)
+    if module_path is None:
+        raise KeyError("unknown scorer: %s" % scorer_id)
+    import importlib
+
+    return importlib.import_module(module_path).PLUGIN
+
+
+def spawn_resolvable(scorer_id: str) -> bool:
+    """True if a spawned worker can rebuild this scorer by importing it.
+
+    This is the real precondition for process-pool evaluation, and it replaces
+    the old `scorer == "fin_v1"` check: a dynamically registered scorer is not
+    visible in a child interpreter, so parallelising it would fail there.
+    """
+    if scorer_id not in _BUILTIN_SCORERS:
+        return False
+    # A registration under a built-in id replaces the importable plugin in this
+    # process only; the child would import the original, so don't parallelise.
+    registered = _SCORERS.get(scorer_id)
+    if registered is not None and registered is not _default_plugin(scorer_id):
+        return False
+    return bool(getattr(_default_plugin(scorer_id), "process_safe", True))
 
 
 def _plugin(scorer_id: str) -> object:
@@ -113,9 +140,8 @@ def evaluate_batch(space: DesignSpace, params_list: List[Dict[str, ParamValue]],
         return []
     if workers == 0 or len(params_list) == 1:
         return [evaluate(space, params, goal) for params in params_list]
-    # Dynamically registered plugins may not exist in spawned interpreters.  The
-    # frozen fin_v1 plugin is importable and is the only parallel scorer today.
-    if space.scorer != "fin_v1":
+    # Only scorers a spawned interpreter can rebuild by import may run in a pool.
+    if not spawn_resolvable(space.scorer):
         return [evaluate(space, params, goal) for params in params_list]
     context = multiprocessing.get_context("spawn")
     jobs = [(space, params, goal) for params in params_list]
