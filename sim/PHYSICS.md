@@ -1,3 +1,156 @@
+# Darwin physics models
+
+Two solvers, one file. **`rear_wing_v1`** is the hero demo (W-B, PLAN.md v4 B.5); **`fin_v1`**
+is the second part and the origin story. Both are screening models: they rank design moves
+and expose tradeoffs; they do not certify a part.
+
+- [Validation table](#validation-table) — every check, regenerated from the code
+- [`rear_wing_v1`](#rear_wing_v1-physics-model) — the race-car rear wing
+- [`fin_v1`](#fin_v1-physics-model) — the rocket fin set
+
+---
+
+## Validation table
+
+Regenerate with `python -m sim.validation` (deterministic, no network, about 2 s).
+`sim/tests/test_validation.py` fails if any row stops passing, so this table cannot drift
+from the model. Every reference is independent of the code it checks: closed-form theory or
+published section data, never the solver checking itself.
+
+**Rear wing (`rear_wing_v1`)**
+
+| Quantity | Reference | Result | |
+|---|---|---|---|
+| Lift slope, NACA 4412, AR 3.04, AoA 2-6 deg | Helmbold low-AR lifting line | -3.8 to -3.4 % | pass |
+| Lift slope, NACA 0012, AR 3.04, AoA 2-6 deg | Helmbold low-AR lifting line | -3.7 to -3.2 % | pass |
+| Flap lift increment, 5-20 deg | Glauert thin-airfoil flap theory | -4.5 to -2.1 % | pass |
+| VLM resolution, default design | converged 24x12 lattice | +0.30 % at 12x6 | pass |
+| Span efficiency, rectangular wing | Anderson ch. 5: delta about 0.05 at AR 6 | delta 0.048 at AR 6; e 0.981 here | pass |
+| Induced drag, default flapped wing | independent VLM near-field estimate | -2.5 % | pass |
+| NACA 4412 section, Re 1e6 (NeuralFoil) | Abbott & von Doenhoff: aL0 ~ -4 deg, ~0.1/deg, CLmax 1.3-1.8 | aL0 -4.3 deg, 0.109/deg, CLmax 1.59 at 14.5 deg | pass |
+| Viscous-correction fixed point | 10 iterations | 0.013 % at 4 | pass |
+| Downforce at 2x speed | q = 0.5 rho V^2: x4, less a Reynolds effect | x4.04 | pass |
+
+**Measured and rejected (why the lift path is VLM, not AeroBuildup)**
+
+| Quantity | Reference | Result | |
+|---|---|---|---|
+| AeroBuildup lift, NACA 4412, AoA 0-8 deg | Helmbold low-AR lifting line | x1.27 to x1.74 (worst at AoA 0) | rejected |
+| VLM with ControlSurface flaps, 0/15/30 deg | should rise with flap | CL 0.5683 / 0.5683 / 0.5683 (flap ignored) | rejected |
+
+**Rocket fin (`fin_v1`)**
+
+| Quantity | Reference | Result | |
+|---|---|---|---|
+| Fin lift slope, 7 designs across the box | Barrowman (1966) vs AeroSandbox | ratio 0.86 to 1.19 (default 1.03) | pass |
+| Flutter vs thickness, 2-5 mm | NACA TN 4197: V_f ~ (t/c)^1.5 | exponent 1.50 | pass |
+
+**How to read the AeroBuildup row.** AeroBuildup was the plan's fast path for wing lift. Its
+lift *slope* is right but it does not reduce camber lift for a finite wing, so on this
+aspect-ratio-3 wing it reports close to the 2D section value at zero angle of attack. A flap
+is extra camber, so the same error inflated flap effectiveness by about 50 % at small angles.
+The trends looked sensible, which is why it passed the prototype; only a comparison against
+theory exposed it.
+
+**Knowledge-layer pilot (Sat Oct 24, n = 1 each, not a result).** One live Sonnet session per
+arm on the default wing goal, same 20-simulation budget: prediction accuracy 0.93 with the
+principles and 0.77 without; final downforce 133.7 N vs 133.2 N (a tie, because both runs
+pushed span and endplates to their limits on step 1). The formal ablation is the proof
+bench (PLAN.md C5).
+
+---
+
+# `rear_wing_v1` physics model
+
+`sim/plugins/rear_wing_v1.py`. An inverted NACA 4412 wing with a plain trailing-edge flap and
+endplates, at 25 m/s. Solved as an upright wing at positive angle of attack and reported as
+downforce; with no ground effect modelled the two are mirror images, so this is exact within
+the model. About 18 ms per fast evaluation.
+
+## Evaluation path
+
+| Step | Quantity | Source |
+|---|---|---|
+| 1 | Effective aspect ratio | Hoerner: `AR_eff = AR (1 + 1.9 h / b)` |
+| 2 | Span efficiency `e` | Prandtl lifting line, Glauert's Fourier solution for the planform |
+| 3 | Inviscid 3D lift | VLM on one full-chord lattice, flap deflected in the airfoil geometry |
+| 4 | Endplate lift correction | ratio of lifting-line slopes at `AR_eff` and `AR` |
+| 5 | Viscous lift loss | NeuralFoil section CL over Glauert thin-airfoil CL, capped at 1.0 |
+| 6 | Effective angle | AoA minus induced angle `CL / (pi e AR_eff)`; 5 and 6 iterate to a fixed point |
+| 7 | Induced drag | `CL^2 / (pi e AR_eff)` |
+| 8 | Profile drag | NeuralFoil section CD at the effective angle, plus endplate skin friction |
+| 9 | Stall margin | NeuralFoil section CL peak for the deflected flap, minus AoA |
+
+`hifi` runs the identical model at a converged 24x12 VLM resolution, so the high-fidelity
+check is a genuine mesh-refinement check rather than a comparison between unrelated methods.
+
+## Why each piece is what it is
+
+- **VLM for lift, not AeroBuildup.** See the rejected rows above.
+- **The flap is deflected in the airfoil coordinates.** AeroSandbox 4.2.8's VLM ignores
+  `ControlSurface` deflection entirely (rejected row). Splitting the main element and flap
+  into two lattices, each with its own 4412 camber, builds a double-humped section that
+  under-predicts lift by 25 % at zero flap. One lattice with the true camber line fixes both.
+- **A viscous correction on top of VLM.** VLM is inviscid, so it never sees a flap's
+  boundary layer separate. NeuralFoil's viscous/inviscid ratio for the flapped section is
+  about 1.0 up to 10 deg of flap and falls to 0.78 at 20 deg and about 0.6 at 30 deg. Without
+  it, VLM over-predicts flap lift by 25-75 %. The same ratio handles stall smoothly, so there
+  is no hard cap.
+- **`e` from lifting-line theory, not from VLM.** VLM's near-field induced drag implies
+  `e = 1.04` on this wing, above the planar maximum of 1 (Munk). Glauert gives 0.981.
+- **Endplate skin friction is included** (turbulent flat plate, `Cf = 0.074 Re^-0.2`, both
+  faces of both plates). It is about 2 % of drag at the default, but without it endplate height
+  would be free and the optimizer would always max it out for a reason that isn't physics.
+
+## Validity envelope
+
+Inside it the model is good for ranking design moves; outside it, results are labelled.
+
+- **Incompressible**, Mach about 0.07 at 25 m/s.
+- **No ground effect, isolated wing.** No car body, wake or interference. Real wings close to
+  the ground make more downforce; absolute numbers are an isolated-wing estimate.
+- **Plain flap, no slot.** A real race-car flap is slotted and stays attached to larger
+  angles, so this model's maximum downforce is **conservative** and its flap saturates early.
+- **Linear lifting-line corrections** for endplates and induced angle: reliable below stall.
+  Past stall the viscous ratio still bounds lift, the design is flagged, and the loop treats
+  negative stall margin as infeasible.
+- **Section Reynolds number 3.5-6 x 10^5**, inside NeuralFoil's validated range for this
+  airfoil; outside about 10^5-10^6 a warning is raised.
+- **Steady flow.** No flap or endplate vortex unsteadiness.
+
+## Behaviour the optimizer meets
+
+All covered by `sim/tests/test_rear_wing.py`.
+
+- **Flap has an interior optimum near 20 deg.** Strong lever at small deflection (+15 % per
+  3 deg from 5 deg), diminishing to +1 % at 15 deg, then downforce falls past about 20 deg
+  while profile drag keeps rising.
+- **AoA and flap share the section's lift budget.** At 5 deg of flap, AoA adds +7 % per
+  degree; at 15 deg of flap it adds +1.4 %.
+- **AoA raises downforce until stall, then it falls.** Default stall margin is +3.5 deg.
+- **Span cuts induced drag per newton of downforce**, but raw induced drag *rises*, because
+  with chord fixed the extra span carries extra lift.
+- **Chord adds area but lowers aspect ratio**, so L/D falls.
+- **Endplates give a small downforce gain and a net drag reduction.**
+- **Headroom:** under a 20 N drag cap, the best design in a 300-sample Latin hypercube makes
+  146 N against 105 N at the default, +39 %.
+
+## Metric normalisation
+
+`typical_min`/`typical_max` for the objectives are calibrated from that 300-sample Latin
+hypercube over the frozen B.5 box (p2 to p98, rounded out). A range that overshoots the real
+spread compresses the score; one that undershoots saturates it; either way the agent loses its
+gradient. The first draft's `downforce_n` range topped out at 260 N against a real maximum of
+157 N, which would have scored the best possible wing at about half the scale.
+
+## Not for
+
+Certification, ride-height or yaw studies, multi-element slot optimisation, or any absolute
+downforce number quoted as a prediction for a real car. Final sign-off is CFD or a wind
+tunnel; the loop is solver-agnostic and can call either.
+
+---
+
 # `fin_v1` physics model
 
 The simulation is a deterministic, reduced-order design-ranking model for a

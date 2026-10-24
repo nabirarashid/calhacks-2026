@@ -282,7 +282,7 @@ Behaviour the agent will meet (all in the golden tests, `sim/tests/test_rear_win
 - **Headroom:** under a 20 N drag cap the best design in a 300-sample LHS makes **146 N vs
   105 N at the default (+39 %)**.
 - 64/64 range corners evaluate; ~18 ms per fast evaluation; `hifi` is the same model at a
-  converged VLM resolution, so it doubles as a mesh-refinement check (−1.7 %).
+  converged VLM resolution, so it doubles as a mesh-refinement check (+0.3 %).
 - **Inverted wing:** solved upright and reported as downforce; exact within the model, since
   no ground effect is modelled.
 
@@ -612,7 +612,7 @@ The numbers above are illustrative. **Say only the numbers from the actual run.*
 | Question | Answer |
 |---|---|
 | Isn't this just an optimizer with an LLM? | An optimizer needs hundreds of runs and gives no reasons. Here's the ablation, and here's the reasoning trail with scored predictions. |
-| How accurate is the aero? | AeroBuildup/VLM with NeuralFoil, validated against XFoil within a few percent (NeuralFoil paper, our validation table). Right for ranking design moves; final sign-off is CFD or a wind tunnel, which the loop can call. |
+| How accurate is the aero? | Lift is a vortex-lattice solve, within ~4 % of low-aspect-ratio lifting-line theory, with the flap increment within 2-5 % of thin-airfoil flap theory. NeuralFoil supplies viscous losses, profile drag and stall, and matches Abbott & von Doenhoff's NACA 4412 data. Every row is in `sim/PHYSICS.md` and regenerates from the code with `python -m sim.validation`. We also caught and replaced AeroSandbox's AeroBuildup for lift, which over-predicts camber lift on this wing by 27-74 %. Isolated wing, no ground effect, plain flap, so absolute downforce is conservative. Right for ranking design moves; final sign-off is CFD or a wind tunnel, which the loop can call. |
 | What if the LLM's physics is wrong? | It predicts before every simulation, and the solver checks it. Accuracy is on screen; when it's wrong, it says so and changes course. Acceptance is decided by code. |
 | Why only aero? | Depth over breadth. The loop is domain-agnostic; aero is where we could make it genuinely smart this weekend. |
 | SimScale already has an Onshape agent. | It runs a simulation and tells you the answer. Darwin decides what to change, changes your model, and learns. |
