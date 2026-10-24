@@ -34,8 +34,8 @@
     "unit": "N",
     "description": "Fin-set drag at design velocity (all fins)",
     "better": "lower",
-    "typical_min": 0.2,
-    "typical_max": 4.0,
+    "typical_min": 1.0,
+    "typical_max": 20.0,
     "default_tolerance": null,
     "default_target": null
   },

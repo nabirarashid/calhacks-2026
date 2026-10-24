@@ -56,7 +56,7 @@ def fixture_design() -> DesignResult:
 def test_objective_scoring_follows_b6_and_clips(catalog: list) -> None:
     info = {item.name: item for item in catalog}
     assert objective_score(2.0, "target", info["stability_margin_cal"], 2.5, 1.0) == pytest.approx(0.5)
-    assert objective_score(2.1, "minimize", info["drag_n"]) == pytest.approx(0.5)
+    assert objective_score(10.5, "minimize", info["drag_n"]) == pytest.approx(0.5)   # midpoint of 1-20 N
     assert objective_score(2.75, "maximize", info["flutter_margin"]) == pytest.approx(0.5)
     assert objective_score(-100.0, "minimize", info["drag_n"]) == 1.0
     assert objective_score(100.0, "minimize", info["drag_n"]) == 0.0

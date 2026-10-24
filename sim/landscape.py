@@ -17,7 +17,7 @@ BatchEvaluateFn = Callable[..., List[Score]]
 
 # Bump whenever scorer physics or serialization changes; this prevents a
 # previously generated cloud from masquerading as results from a new model.
-_CACHE_SCHEMA = 2
+_CACHE_SCHEMA = 3  # 3: drag_n normalization changed (scores are cached, the catalog is not keyed)
 DEFAULT_CACHE_DIR = Path(".darwin") / "landscape"
 
 

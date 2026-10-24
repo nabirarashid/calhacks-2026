@@ -49,8 +49,11 @@ def _catalog() -> List[MetricInfo]:
             unit="N",
             description="Fin-set drag at design velocity (all fins)",
             better="lower",
-            typical_min=0.2,
-            typical_max=4.0,
+            # Square edges (the only profile the live Part Studio builds) put fin-set drag at
+            # 3-22 N over the design space (600-sample LHS, median 9 N). The old 0.2-4.0 N
+            # range left drag_n scoring 0 for ~98 % of designs, so "keep drag low" had no signal.
+            typical_min=1.0,
+            typical_max=20.0,
         ),
         MetricInfo(
             name="cd_fins",
