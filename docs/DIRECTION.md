@@ -1,7 +1,9 @@
-# Darwin — direction v4 (proposal, Sat Oct 24 ~13:45)
+# Darwin — direction v4 (accepted Sat Oct 24 14:40)
 
-Status: **proposal for the team to accept or amend.** Once accepted, it replaces the
-scope of "Weekend plan v3" in PLAN.md and we don't change direction again.
+Status: **accepted and locked.** This file is the rationale (problem, competition, why now,
+pitch, sources). **`PLAN.md` is the plan**: scope, contracts, workstreams and schedule live
+there. Where they differ (e.g. §12's schedule below, written before the 14:49 morph spike),
+PLAN.md wins.
 
 ---
 
