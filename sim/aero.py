@@ -6,6 +6,7 @@ returned warnings; results remain deterministic and no network access occurs.
 """
 import math
 import os
+import threading
 import warnings as python_warnings
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,12 +45,19 @@ class AeroResult:
 
 _ASB = None  # type: Optional[Any]
 _ASB_IMPORT_ATTEMPTED = False
+# The run loop and the baselines evaluate on separate threads. Without the lock,
+# a second caller sees the "attempted" flag before the first import finishes and
+# silently scores its design with the analytic fallback.
+_ASB_LOCK = threading.Lock()
 
 
 def _load_aerosandbox() -> Optional[Any]:
     global _ASB, _ASB_IMPORT_ATTEMPTED
-    if not _ASB_IMPORT_ATTEMPTED:
-        _ASB_IMPORT_ATTEMPTED = True
+    if _ASB_IMPORT_ATTEMPTED:
+        return _ASB
+    with _ASB_LOCK:
+        if _ASB_IMPORT_ATTEMPTED:
+            return _ASB
         try:
             # Keep Matplotlib's import cache inside Darwin's ignored runtime
             # directory rather than touching the user's home directory.
@@ -64,6 +72,7 @@ def _load_aerosandbox() -> Optional[Any]:
             _ASB = asb
         except (ImportError, OSError):
             _ASB = None
+        _ASB_IMPORT_ATTEMPTED = True
     return _ASB
 
 
