@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 DEFAULT_OUTPUT = Path(__file__).parent / "assets" / "naca4412_inverted_unit.dxf"
+DEFAULT_R12_OUTPUT = Path(__file__).parent / "assets" / "naca4412_inverted_unit_r12.dxf"
 POINT_COUNT = 81
 CAMBER = 0.04
 CAMBER_POSITION = 0.4
@@ -61,11 +62,30 @@ def dxf_text(points):
     return "\n".join(lines)
 
 
+def r12_dxf_text(points):
+    """Serialize the same closed loop as plain R12 LINE entities."""
+    lines = ["0", "SECTION", "2", "HEADER", "9", "$ACADVER", "1", "AC1009",
+             "0", "ENDSEC", "0", "SECTION", "2", "ENTITIES"]
+    for (x1, y1), (x2, y2) in zip(points, points[1:]):
+        lines.extend(("0", "LINE", "8", "0", "10", "{:.12f}".format(x1),
+                      "20", "{:.12f}".format(y1), "30", "0.0",
+                      "11", "{:.12f}".format(x2), "21", "{:.12f}".format(y2),
+                      "31", "0.0"))
+    lines.extend(("0", "ENDSEC", "0", "EOF", ""))
+    return "\n".join(lines)
+
+
 def main():
-    output = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_OUTPUT
+    args = sys.argv[1:]
+    if args and args[0] == "--r12":
+        output = Path(args[1]) if len(args) > 1 else DEFAULT_R12_OUTPUT
+        content = r12_dxf_text(profile_points())
+    else:
+        output = Path(args[0]) if args else DEFAULT_OUTPUT
+        content = dxf_text(profile_points())
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", encoding="ascii", newline="\n") as stream:
-        stream.write(dxf_text(profile_points()))
+        stream.write(content)
 
 
 if __name__ == "__main__":
