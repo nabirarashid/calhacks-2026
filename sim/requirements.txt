@@ -1,0 +1,2 @@
+# S2 simulation dependencies. Install the repository root requirements first.
+aerosandbox==4.2.8
