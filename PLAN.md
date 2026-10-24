@@ -28,10 +28,9 @@ URL is a workspace URL, and a live read-only configuration GET verified five
 quantity inputs and their units/ranges. The update payload, read-back, geometry
 verification, named-version sequence, exact-target acknowledgement, and backend
 approval gate are implemented under mocked tests. The live document does not
-have Darwin's sixth CAD-driven input, `edge_profile`; this mismatch blocks an
-exact champion handoff until the model gains that input or the live design space
-is deliberately constrained to square edges. No external Onshape write has been
-attempted.
+have an `edge_profile` input, so the live design space is deliberately fixed to
+square edges and marks that parameter non-CAD-driven. Rounded and beveled edges
+remain a later extension. No external Onshape write has been attempted.
 
 - [x] **Engineering diff:** show seed-to-champion parameter changes, metric
   changes, every hard requirement with actual/limit/margin/pass-fail, CAD
@@ -109,9 +108,9 @@ development copy only after explicit write opt-in.
   authentication and the expected five quantity inputs/ranges were verified.
 - Guarded Onshape persistence and approval gate: mocked sequence tests pass;
   update is followed by read-back, geometry verification, and version creation.
-- Live Onshape write: **not attempted**. It remains blocked because the model
-  lacks the CAD-driven `edge_profile` input and the configured workspace has not
-  yet been explicitly confirmed as a disposable development target.
+- Live Onshape write: **not attempted**. The `edge_profile` mismatch is resolved
+  by fixing it to square; a live write still requires an approved exact champion
+  and explicit confirmation of the target workspace at execution time.
 
 ### Post-hackathon
 

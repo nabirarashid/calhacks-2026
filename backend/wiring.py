@@ -76,6 +76,17 @@ class Wiring:
 
     def _load_spaces(self) -> List[DesignSpace]:
         fin = DesignSpace.model_validate_json((FIXTURES / "design_space_fin.json").read_text())
+        # The current Onshape Part Studio has square edges and no profile input.
+        # Preserve the frozen fixture for historical recordings, but constrain
+        # every new live run to the geometry the CAD document can reproduce.
+        fin = fin.model_copy(update={
+            "parameters": [
+                p.model_copy(update={"choices": ["square"], "default": "square",
+                                     "cad_driven": False})
+                if p.name == "edge_profile" else p
+                for p in fin.parameters
+            ]
+        })
         url = os.environ.get("DARWIN_FIN_DOC_URL")
         if url:
             fin = fin.model_copy(update={"source": fin.source.model_copy(update={"doc_url": url})})
