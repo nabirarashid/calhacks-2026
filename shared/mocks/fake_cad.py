@@ -1,7 +1,7 @@
 """Fake CAD with the same signatures as cad.api (PLAN.md B.7 / B.10). Zero network.
 
-Writes a real ASCII STL of the square-edged plate (B.5 frame) to the geometry
-cache. Cache misses sleep FAKE_CAD_LATENCY seconds (default 1.7). About 5 % of
+Writes a real ASCII STL of the square-edged plate (B.5 frame) to
+.darwin/geometry_mock/ (never the real cad cache). Cache misses sleep FAKE_CAD_LATENCY seconds (default 1.7). About 5 % of
 geometry keys fail deterministically with regen_status "ERROR". Keeps a fake
 ledger that starts at 2400 calls with reserve 400.
 """
@@ -25,7 +25,8 @@ START, RESERVE = 2400, 400
 
 
 def cache_dir() -> Path:
-    d = Path(os.environ.get("DARWIN_CACHE_DIR", ".darwin")) / "geometry"
+    # Separate from cad/'s .darwin/geometry so a mock STL can never be served as an Onshape export.
+    d = Path(os.environ.get("DARWIN_CACHE_DIR", ".darwin")) / os.environ.get("FAKE_CAD_SUBDIR", "geometry_mock")
     d.mkdir(parents=True, exist_ok=True)
     return d
 

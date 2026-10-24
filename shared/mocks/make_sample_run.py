@@ -62,6 +62,7 @@ def main() -> None:
     os.environ["FAKE_CAD_LATENCY"] = "0"
     os.environ["FAKE_LLM_LATENCY"] = "0"
     os.environ["DARWIN_CACHE_DIR"] = str(FIXTURES)          # fake_cad writes fixtures/geometry/
+    os.environ["FAKE_CAD_SUBDIR"] = "geometry"
     geo_dir = FIXTURES / "geometry"
     if geo_dir.exists():
         for f in geo_dir.iterdir():

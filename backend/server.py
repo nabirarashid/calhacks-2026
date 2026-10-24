@@ -240,7 +240,12 @@ def commit(run_id: str, req: DesignRequest) -> Dict[str, Any]:
 def export(run_id: str, req: DesignRequest) -> FileResponse:
     d = _find_design(run_id, req.design_id)
     space = _space(_summary(run_id)["design_space_id"])
-    z = W.cad.export_print_package(space, d["params"], runs_dir().parent / "exports")
+    try:
+        z = W.cad.export_print_package(space, d["params"], runs_dir().parent / "exports")
+    except NotImplementedError as e:
+        raise HTTPException(501, "print export not available yet: %s" % e)
+    if not z:
+        raise HTTPException(502, "print export failed")
     return FileResponse(str(z), media_type="application/zip", filename=Path(z).name)
 
 
@@ -282,6 +287,8 @@ def budget() -> Dict[str, Any]:
 def discover(req: DiscoverRequest) -> Dict[str, Any]:
     try:
         space = W.cad.discover_design_space(req.doc_url, probe=req.probe)
+    except NotImplementedError as e:
+        raise HTTPException(501, "discovery not available yet: %s" % e)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(502, "discovery failed: %s" % e)
     return W.public_space(space).model_dump(mode="json")
