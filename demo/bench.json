@@ -1,0 +1,1154 @@
+{
+  "generated_at": "2026-10-24T12:29:26",
+  "design_space": "fin_v1",
+  "edge_profile": "square (live Part Studio)",
+  "seeds": 3,
+  "budget_evals": 64,
+  "llm_provider": "anthropic",
+  "agent_beats_cmaes": "6/9",
+  "llm_usd_total": 0.148,
+  "goals": {
+    "Stable & light": {
+      "oracle": 0.6564843753801374,
+      "methods": {
+        "agent": {
+          "median_best": 0.5799296199216619,
+          "finals": [
+            0.6019286110996118,
+            0.4099918521067648,
+            0.5799296199216619
+          ],
+          "median_pct_of_oracle": 88.33867821848061,
+          "reached_95pct": 0,
+          "median_evals_to_95pct": null
+        },
+        "cmaes": {
+          "median_best": 0.5584930042503475,
+          "finals": [
+            0.5584930042503475,
+            0.33914263983022996,
+            0.6564843753801374
+          ],
+          "median_pct_of_oracle": 85.0733125105913,
+          "reached_95pct": 1,
+          "median_evals_to_95pct": 16
+        },
+        "random": {
+          "median_best": 0.39501327814990655,
+          "finals": [
+            0.48863061101020255,
+            0.38681920342657505,
+            0.39501327814990655
+          ],
+          "median_pct_of_oracle": 60.17100984637662,
+          "reached_95pct": 0,
+          "median_evals_to_95pct": null
+        }
+      },
+      "agent_beats_cmaes": "2/3"
+    },
+    "Min drag @ 1.5 cal": {
+      "oracle": 0.7733243680397895,
+      "methods": {
+        "agent": {
+          "median_best": 0.7607734144583647,
+          "finals": [
+            0.7733243680397895,
+            0.7607734144583647,
+            0.7535344179603665
+          ],
+          "median_pct_of_oracle": 98.3770130490988,
+          "reached_95pct": 3,
+          "median_evals_to_95pct": 40
+        },
+        "cmaes": {
+          "median_best": 0.694522997260866,
+          "finals": [
+            0.7431867676104222,
+            0.694522997260866,
+            0.6814869545919333
+          ],
+          "median_pct_of_oracle": 89.81004943906422,
+          "reached_95pct": 1,
+          "median_evals_to_95pct": 64
+        },
+        "random": {
+          "median_best": 0.6983221062049301,
+          "finals": [
+            0.7239839636371037,
+            0.6680791458563948,
+            0.6983221062049301
+          ],
+          "median_pct_of_oracle": 90.30131922197486,
+          "reached_95pct": 0,
+          "median_evals_to_95pct": null
+        }
+      },
+      "agent_beats_cmaes": "3/3"
+    },
+    "Flutter-safe @ 200 m/s": {
+      "oracle": 0.712382546452357,
+      "methods": {
+        "agent": {
+          "median_best": 0.5848266896213834,
+          "finals": [
+            0.5765428547394218,
+            0.6885491431683426,
+            0.5848266896213834
+          ],
+          "median_pct_of_oracle": 82.09447192857296,
+          "reached_95pct": 1,
+          "median_evals_to_95pct": 48
+        },
+        "cmaes": {
+          "median_best": 0.6254827320148709,
+          "finals": [
+            0.6186361871424835,
+            0.6254827320148709,
+            0.6841269340506355
+          ],
+          "median_pct_of_oracle": 87.80152393257745,
+          "reached_95pct": 1,
+          "median_evals_to_95pct": 48
+        },
+        "random": {
+          "median_best": 0.4939642350240954,
+          "finals": [
+            0.4764001483188667,
+            0.4939642350240954,
+            0.6416601501682079
+          ],
+          "median_pct_of_oracle": 69.33974414224801,
+          "reached_95pct": 0,
+          "median_evals_to_95pct": null
+        }
+      },
+      "agent_beats_cmaes": "1/3"
+    }
+  },
+  "runs": [
+    {
+      "goal": "Stable & light",
+      "seed": 1,
+      "best": {
+        "agent": 0.6019286110996118,
+        "cmaes": 0.5584930042503475,
+        "random": 0.48863061101020255
+      },
+      "curves": {
+        "agent": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.38663
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.56335
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.56335
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.57575
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.57932
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.58543
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.58866
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.60193
+          }
+        ],
+        "cmaes": [
+          {
+            "evals": 8,
+            "best_aggregate": -0.01146
+          },
+          {
+            "evals": 16,
+            "best_aggregate": -0.01146
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.47076
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.47076
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.55849
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.55849
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.55849
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.55849
+          }
+        ],
+        "random": [
+          {
+            "evals": 8,
+            "best_aggregate": -0.04688
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.45462
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.48863
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.48863
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.48863
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.48863
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.48863
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.48863
+          }
+        ]
+      },
+      "evals": 64,
+      "seen_max": 0.6019286110996118,
+      "degradations": [],
+      "llm_usd": 0.01925,
+      "llm_calls": 18,
+      "seconds": 67.0
+    },
+    {
+      "goal": "Stable & light",
+      "seed": 2,
+      "best": {
+        "agent": 0.4099918521067648,
+        "cmaes": 0.33914263983022996,
+        "random": 0.38681920342657505
+      },
+      "curves": {
+        "agent": [
+          {
+            "evals": 8,
+            "best_aggregate": -0.01128
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.4041
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.4041
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.4041
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.4041
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.40923
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.40954
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.40999
+          }
+        ],
+        "cmaes": [
+          {
+            "evals": 8,
+            "best_aggregate": -0.08505
+          },
+          {
+            "evals": 16,
+            "best_aggregate": -0.0439
+          },
+          {
+            "evals": 24,
+            "best_aggregate": -0.0439
+          },
+          {
+            "evals": 32,
+            "best_aggregate": -0.01593
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.33914
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.33914
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.33914
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.33914
+          }
+        ],
+        "random": [
+          {
+            "evals": 8,
+            "best_aggregate": -0.10665
+          },
+          {
+            "evals": 16,
+            "best_aggregate": -0.071
+          },
+          {
+            "evals": 24,
+            "best_aggregate": -0.071
+          },
+          {
+            "evals": 32,
+            "best_aggregate": -0.04551
+          },
+          {
+            "evals": 40,
+            "best_aggregate": -0.03542
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.38682
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.38682
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.38682
+          }
+        ]
+      },
+      "evals": 64,
+      "seen_max": 0.4099918521067648,
+      "degradations": [],
+      "llm_usd": 0.01873,
+      "llm_calls": 19,
+      "seconds": 62.8
+    },
+    {
+      "goal": "Stable & light",
+      "seed": 3,
+      "best": {
+        "agent": 0.5799296199216619,
+        "cmaes": 0.6564843753801374,
+        "random": 0.39501327814990655
+      },
+      "curves": {
+        "agent": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.38663
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.38663
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.39542
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.53742
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.53913
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.53913
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.57993
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.57993
+          }
+        ],
+        "cmaes": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.55335
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.65648
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.65648
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.65648
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.65648
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.65648
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.65648
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.65648
+          }
+        ],
+        "random": [
+          {
+            "evals": 8,
+            "best_aggregate": -0.08221
+          },
+          {
+            "evals": 16,
+            "best_aggregate": -0.04657
+          },
+          {
+            "evals": 24,
+            "best_aggregate": -0.04219
+          },
+          {
+            "evals": 32,
+            "best_aggregate": -0.04219
+          },
+          {
+            "evals": 40,
+            "best_aggregate": -0.04219
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.39501
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.39501
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.39501
+          }
+        ]
+      },
+      "evals": 64,
+      "seen_max": 0.6564843753801374,
+      "degradations": [],
+      "llm_usd": 0.01771,
+      "llm_calls": 18,
+      "seconds": 58.9
+    },
+    {
+      "goal": "Min drag @ 1.5 cal",
+      "seed": 1,
+      "best": {
+        "agent": 0.7733243680397895,
+        "cmaes": 0.7431867676104222,
+        "random": 0.7239839636371037
+      },
+      "curves": {
+        "agent": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.38863
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.62789
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.64729
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.72311
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.76371
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.76598
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.77321
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.77332
+          }
+        ],
+        "cmaes": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.6393
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.6393
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.6393
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.6393
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.65134
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.68705
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.69119
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.74319
+          }
+        ],
+        "random": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.38863
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.72398
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.72398
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.72398
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.72398
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.72398
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.72398
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.72398
+          }
+        ]
+      },
+      "evals": 64,
+      "seen_max": 0.7733243680397895,
+      "degradations": [],
+      "llm_usd": 0.01621,
+      "llm_calls": 17,
+      "seconds": 59.8
+    },
+    {
+      "goal": "Min drag @ 1.5 cal",
+      "seed": 2,
+      "best": {
+        "agent": 0.7607734144583647,
+        "cmaes": 0.694522997260866,
+        "random": 0.6680791458563948
+      },
+      "curves": {
+        "agent": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.44864
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.64247
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.72271
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.72271
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.76077
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.76077
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.76077
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.76077
+          }
+        ],
+        "cmaes": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.57142
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.57142
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.57142
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.67921
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.69452
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.69452
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.69452
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.69452
+          }
+        ],
+        "random": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.38863
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.66808
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.66808
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.66808
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.66808
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.66808
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.66808
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.66808
+          }
+        ]
+      },
+      "evals": 64,
+      "seen_max": 0.7607734144583647,
+      "degradations": [],
+      "llm_usd": 0.01748,
+      "llm_calls": 18,
+      "seconds": 62.6
+    },
+    {
+      "goal": "Min drag @ 1.5 cal",
+      "seed": 3,
+      "best": {
+        "agent": 0.7535344179603665,
+        "cmaes": 0.6814869545919333,
+        "random": 0.6983221062049301
+      },
+      "curves": {
+        "agent": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.65116
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.73338
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.74558
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.74558
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.75044
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.75353
+          }
+        ],
+        "cmaes": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.56873
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.56873
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.56873
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.67026
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.68149
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.68149
+          }
+        ],
+        "random": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.54849
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.69832
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.69832
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.69832
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.69832
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.69832
+          }
+        ]
+      },
+      "evals": 48,
+      "seen_max": 0.7535344179603665,
+      "degradations": [],
+      "llm_usd": 0.01338,
+      "llm_calls": 15,
+      "seconds": 48.2
+    },
+    {
+      "goal": "Flutter-safe @ 200 m/s",
+      "seed": 1,
+      "best": {
+        "agent": 0.5765428547394218,
+        "cmaes": 0.6186361871424835,
+        "random": 0.4764001483188667
+      },
+      "curves": {
+        "agent": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.30475
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.32284
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.32612
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.43682
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.51913
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.57654
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.57654
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.57654
+          }
+        ],
+        "cmaes": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.26321
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.61864
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.61864
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.61864
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.61864
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.61864
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.61864
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.61864
+          }
+        ],
+        "random": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.18001
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.18001
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.42471
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.4764
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.4764
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.4764
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.4764
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.4764
+          }
+        ]
+      },
+      "evals": 64,
+      "seen_max": 0.6186361871424835,
+      "degradations": [],
+      "llm_usd": 0.01465,
+      "llm_calls": 15,
+      "seconds": 65.6
+    },
+    {
+      "goal": "Flutter-safe @ 200 m/s",
+      "seed": 2,
+      "best": {
+        "agent": 0.6885491431683426,
+        "cmaes": 0.6254827320148709,
+        "random": 0.4939642350240954
+      },
+      "curves": {
+        "agent": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.57903
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.60818
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.66345
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.66345
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.66431
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.67909
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.6813
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.68855
+          }
+        ],
+        "cmaes": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.4993
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.4993
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.4993
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.4993
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.4993
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.55209
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.62548
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.62548
+          }
+        ],
+        "random": [
+          {
+            "evals": 8,
+            "best_aggregate": -0.04976
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.43943
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.43943
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.49396
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.49396
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.49396
+          },
+          {
+            "evals": 56,
+            "best_aggregate": 0.49396
+          },
+          {
+            "evals": 64,
+            "best_aggregate": 0.49396
+          }
+        ]
+      },
+      "evals": 64,
+      "seen_max": 0.6885491431683426,
+      "degradations": [],
+      "llm_usd": 0.01701,
+      "llm_calls": 18,
+      "seconds": 60.9
+    },
+    {
+      "goal": "Flutter-safe @ 200 m/s",
+      "seed": 3,
+      "best": {
+        "agent": 0.5848266896213834,
+        "cmaes": 0.6841269340506355,
+        "random": 0.6416601501682079
+      },
+      "curves": {
+        "agent": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.36968
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.40695
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.58483
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.58483
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.58483
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.58483
+          }
+        ],
+        "cmaes": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.3713
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.3713
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.58121
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.58121
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.67041
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.68413
+          }
+        ],
+        "random": [
+          {
+            "evals": 8,
+            "best_aggregate": 0.55847
+          },
+          {
+            "evals": 16,
+            "best_aggregate": 0.62224
+          },
+          {
+            "evals": 24,
+            "best_aggregate": 0.64166
+          },
+          {
+            "evals": 32,
+            "best_aggregate": 0.64166
+          },
+          {
+            "evals": 40,
+            "best_aggregate": 0.64166
+          },
+          {
+            "evals": 48,
+            "best_aggregate": 0.64166
+          }
+        ]
+      },
+      "evals": 48,
+      "seen_max": 0.6841269340506355,
+      "degradations": [],
+      "llm_usd": 0.01357,
+      "llm_calls": 15,
+      "seconds": 48.4
+    }
+  ]
+}
