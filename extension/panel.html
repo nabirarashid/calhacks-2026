@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Darwin</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <main id="status" class="status" aria-live="polite">
+      <div class="mark" aria-hidden="true">D</div>
+      <p>Connecting Darwin to this Onshape document…</p>
+    </main>
+    <iframe
+      id="darwin-panel"
+      class="panel"
+      title="Darwin design investigator"
+      referrerpolicy="no-referrer"
+      hidden
+    ></iframe>
+    <script type="module" src="panel.js"></script>
+  </body>
+</html>
