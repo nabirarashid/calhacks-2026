@@ -1,2 +1,10 @@
 # S2 simulation dependencies. Install the repository root requirements first.
 aerosandbox==4.2.8
+
+# FEA (W-B, G-FEA verdict GO (b) — see sim/FEA_SPIKE.md).
+# scikit-fem >= 10 requires Python >= 3.10; we are pinned to 3.9 team-wide.
+# structural_fea_v1 MUST use quadratic tets: ElementTetP1 is 22-51 % too stiff
+# in bending and converges smoothly while being wrong (test_fea_cantilever.py).
+scikit-fem<10
+gmsh>=4.11
+meshio>=5.3
