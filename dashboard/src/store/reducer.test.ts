@@ -93,6 +93,20 @@ describe('event fold', () => {
 
     expect(reduceEvent(emptyRunState('run_errors'), event).errors).toEqual([payload]);
   });
+
+  it('tracks the latest progress for each structural analysis stage', () => {
+    const state = emptyRunState('run_analysis');
+    const progress = (seq: number, pct: number) => ({
+      v: 1 as const,
+      type: 'analysis_progress' as const,
+      run_id: 'run_analysis',
+      seq,
+      ts: seq,
+      payload: { design_id: 'd1', adapter_id: 'structural_fea_v1', stage: 'solve' as const, pct, elapsed_ms: seq * 10 },
+    });
+    const next = reduceEvent(reduceEvent(state, progress(1, 20)), progress(2, 80));
+    expect(next.analysisProgress).toEqual([progress(2, 80).payload]);
+  });
 });
 
 describe('zustand event store', () => {

@@ -1,16 +1,17 @@
-import type { AnyDarwinEvent, EventType } from '@shared/contracts';
+import type { EventType } from '@shared/contracts';
+import type { DashboardEvent } from './events';
 
 export type SourceStatus = 'connecting' | 'live' | 'reconnecting' | 'replay' | 'complete' | 'error';
 
 export interface EventObserver {
-  next(event: AnyDarwinEvent): void;
+  next(event: DashboardEvent): void;
   error?(error: Error): void;
   status?(status: SourceStatus): void;
   complete?(): void;
 }
 
 export interface EventSource {
-  subscribe(observer: EventObserver | ((event: AnyDarwinEvent) => void)): () => void;
+  subscribe(observer: EventObserver | ((event: DashboardEvent) => void)): () => void;
 }
 
 export interface WebSocketSourceOptions {
@@ -20,7 +21,7 @@ export interface WebSocketSourceOptions {
   webSocketFactory?: (url: string) => WebSocket;
 }
 
-const EVENT_TYPES: ReadonlySet<EventType> = new Set([
+const EVENT_TYPES: ReadonlySet<EventType | 'analysis_progress'> = new Set([
   'run_started',
   'design_evaluated',
   'generation_complete',
@@ -30,12 +31,13 @@ const EVENT_TYPES: ReadonlySet<EventType> = new Set([
   'baseline_progress',
   'landscape_ready',
   'budget_update',
+  'analysis_progress',
   'run_complete',
   'error',
 ]);
 
 function asObserver(
-  observer: EventObserver | ((event: AnyDarwinEvent) => void),
+  observer: EventObserver | ((event: DashboardEvent) => void),
 ): EventObserver {
   return typeof observer === 'function' ? { next: observer } : observer;
 }
@@ -46,11 +48,11 @@ function asError(error: unknown, prefix?: string): Error {
 }
 
 /** Minimal runtime validation at the untrusted socket/file boundary. */
-export function parseEvent(value: unknown): AnyDarwinEvent {
+export function parseEvent(value: unknown): DashboardEvent {
   if (typeof value !== 'object' || value === null) throw new Error('event must be an object');
   const candidate = value as Record<string, unknown>;
   if (candidate.v !== 1) throw new Error('event.v must be 1');
-  if (typeof candidate.type !== 'string' || !EVENT_TYPES.has(candidate.type as EventType)) {
+  if (typeof candidate.type !== 'string' || !EVENT_TYPES.has(candidate.type as EventType | 'analysis_progress')) {
     throw new Error(`unknown event type: ${String(candidate.type)}`);
   }
   if (typeof candidate.run_id !== 'string' || candidate.run_id.length === 0) {
@@ -65,11 +67,11 @@ export function parseEvent(value: unknown): AnyDarwinEvent {
   if (typeof candidate.payload !== 'object' || candidate.payload === null) {
     throw new Error('event.payload must be an object');
   }
-  return candidate as unknown as AnyDarwinEvent;
+  return candidate as unknown as DashboardEvent;
 }
 
-export function parseJsonl(jsonl: string): AnyDarwinEvent[] {
-  const events: AnyDarwinEvent[] = [];
+export function parseJsonl(jsonl: string): DashboardEvent[] {
+  const events: DashboardEvent[] = [];
   for (const [index, rawLine] of jsonl.split(/\r?\n/).entries()) {
     const line = rawLine.trim();
     if (!line) continue;

@@ -48,6 +48,18 @@ describe('event sources', () => {
     );
   });
 
+  it('accepts the additive analysis_progress event used by structural solvers', () => {
+    const progress = {
+      v: 1,
+      type: 'analysis_progress',
+      run_id: 'run_source',
+      seq: 4,
+      ts: 2,
+      payload: { design_id: 'd1', adapter_id: 'structural_fea_v1', stage: 'mesh', pct: 45, elapsed_ms: 120 },
+    };
+    expect(parseJsonl(JSON.stringify(progress))).toEqual([progress]);
+  });
+
   it('replays timestamp gaps at the requested speed and can be cancelled', () => {
     vi.useFakeTimers();
     const lines = [event(1, 10), event(2, 10.4), event(3, 11)]

@@ -1,8 +1,9 @@
-import type { AnyDarwinEvent, DesignResult } from '@shared/contracts';
+import type { DesignResult } from '@shared/contracts';
 import { create } from 'zustand';
 
 import { foldRunEvents, type RunFoldState } from './reducer';
 import type { EventSource, SourceStatus } from './sources';
+import type { DashboardEvent } from './events';
 
 export interface DashboardStoreState {
   runs: Record<string, RunFoldState>;
@@ -12,8 +13,8 @@ export interface DashboardStoreState {
   selectionPinned: boolean;
   sourceStatus: SourceStatus | 'idle';
   sourceError: string | null;
-  ingest(event: AnyDarwinEvent): void;
-  ingestMany(events: readonly AnyDarwinEvent[]): void;
+  ingest(event: DashboardEvent): void;
+  ingestMany(events: readonly DashboardEvent[]): void;
   setActiveRun(runId: string): void;
   selectDesign(designId: string | null): void;
   setSourceStatus(status: SourceStatus | 'idle'): void;
@@ -22,9 +23,9 @@ export interface DashboardStoreState {
 }
 
 function mergeEvents(
-  previous: readonly AnyDarwinEvent[],
-  incoming: readonly AnyDarwinEvent[],
-): AnyDarwinEvent[] {
+  previous: readonly DashboardEvent[],
+  incoming: readonly DashboardEvent[],
+): DashboardEvent[] {
   const bySeq = new Map(previous.map((event) => [event.seq, event]));
   for (const event of incoming) {
     if (!bySeq.has(event.seq)) bySeq.set(event.seq, event);
@@ -48,7 +49,7 @@ export const useDashboardStore = create<DashboardStoreState>((set, get) => ({
     set((state) => {
       const runs = { ...state.runs };
       const runOrder = [...state.runOrder];
-      const grouped = new Map<string, AnyDarwinEvent[]>();
+      const grouped = new Map<string, DashboardEvent[]>();
       for (const event of events) {
         const batch = grouped.get(event.run_id) ?? [];
         batch.push(event);

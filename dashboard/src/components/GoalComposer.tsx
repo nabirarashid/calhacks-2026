@@ -23,7 +23,7 @@ export function GoalComposer({
   onGoalChange,
   onRun,
 }: GoalComposerProps) {
-  const [text, setText] = useState(goal?.source_text ?? 'Design a stable, low-drag rocket fin under 40 grams.');
+  const [text, setText] = useState(goal?.source_text ?? 'Make this design lighter while meeting every approved requirement.');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

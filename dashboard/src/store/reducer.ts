@@ -1,6 +1,5 @@
 import type {
   AgentMessage,
-  AnyDarwinEvent,
   BaselineProgressPayload,
   BudgetStatus,
   CurvePoint,
@@ -13,12 +12,14 @@ import type {
   MetricInfo,
   RunSummary,
 } from '@shared/contracts';
+import type { AnalysisProgressSnapshot } from '@/lib/projects';
+import type { DashboardEvent } from './events';
 
 export type BaselineMethod = BaselineProgressPayload['method'];
 
 export interface RunFoldState {
   runId: string;
-  events: AnyDarwinEvent[];
+  events: DashboardEvent[];
   eventCount: number;
   lastSeq: number;
   status: RunSummary['status'] | 'pending';
@@ -40,6 +41,7 @@ export interface RunFoldState {
   budget: BudgetStatus | null;
   paretoIds: string[];
   errors: ErrorPayload[];
+  analysisProgress: AnalysisProgressSnapshot[];
 }
 
 export interface FoldedDashboardState {
@@ -72,6 +74,7 @@ export function emptyRunState(runId: string): RunFoldState {
     budget: null,
     paretoIds: [],
     errors: [],
+    analysisProgress: [],
   };
 }
 
@@ -114,7 +117,7 @@ function patchSummary(
  * Apply one already-ordered event. This function is deliberately free of Zustand,
  * timers, sockets, and React so live streams and recordings use the same logic.
  */
-export function reduceEvent(state: RunFoldState, event: AnyDarwinEvent): RunFoldState {
+export function reduceEvent(state: RunFoldState, event: DashboardEvent): RunFoldState {
   if (state.runId !== event.run_id) {
     throw new Error(`Cannot apply event for ${event.run_id} to run ${state.runId}`);
   }
@@ -235,6 +238,15 @@ export function reduceEvent(state: RunFoldState, event: AnyDarwinEvent): RunFold
         summary: patchSummary(next.summary, { budget: event.payload.budget }),
       };
 
+    case 'analysis_progress':
+      return {
+        ...next,
+        analysisProgress: [
+          ...next.analysisProgress.filter((item) => !(item.design_id === event.payload.design_id && item.stage === event.payload.stage)),
+          event.payload,
+        ],
+      };
+
     case 'run_complete': {
       const summary = event.payload.summary;
       next = {
@@ -260,10 +272,6 @@ export function reduceEvent(state: RunFoldState, event: AnyDarwinEvent): RunFold
     case 'error':
       return { ...next, errors: [...next.errors, event.payload] };
 
-    case 'analysis_progress':
-      // contracts v1.1: FEA stage progress. W-D renders it in P3-D1; until then it is ignored.
-      return next;
-
     default: {
       const exhaustive: never = event;
       return exhaustive;
@@ -272,8 +280,8 @@ export function reduceEvent(state: RunFoldState, event: AnyDarwinEvent): RunFold
 }
 
 /** Keep the first copy of a sequence number and return canonical wire order. */
-export function normalizeRunEvents(events: readonly AnyDarwinEvent[]): AnyDarwinEvent[] {
-  const bySeq = new Map<number, AnyDarwinEvent>();
+export function normalizeRunEvents(events: readonly DashboardEvent[]): DashboardEvent[] {
+  const bySeq = new Map<number, DashboardEvent>();
   for (const event of events) {
     if (!bySeq.has(event.seq)) bySeq.set(event.seq, event);
   }
@@ -281,7 +289,7 @@ export function normalizeRunEvents(events: readonly AnyDarwinEvent[]): AnyDarwin
 }
 
 export function foldRunEvents(
-  events: readonly AnyDarwinEvent[],
+  events: readonly DashboardEvent[],
   runId = events[0]?.run_id,
 ): RunFoldState {
   if (!runId) throw new Error('foldRunEvents requires a run id or at least one event');
@@ -291,9 +299,9 @@ export function foldRunEvents(
   return { ...folded, events: ordered, eventCount: ordered.length };
 }
 
-export function foldEvents(events: readonly AnyDarwinEvent[]): FoldedDashboardState {
+export function foldEvents(events: readonly DashboardEvent[]): FoldedDashboardState {
   const runOrder: string[] = [];
-  const grouped = new Map<string, AnyDarwinEvent[]>();
+  const grouped = new Map<string, DashboardEvent[]>();
   for (const event of events) {
     if (!grouped.has(event.run_id)) {
       grouped.set(event.run_id, []);
