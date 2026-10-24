@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title desc">
+  <title id="title">Darwin architecture</title>
+  <desc id="desc">The React dashboard consumes events from a FastAPI backend, which orchestrates simulation, language-model agents, and Onshape CAD.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#07100f"/><stop offset="1" stop-color="#0d1b18"/></linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0L9 3 0 6z" fill="#70f0b6"/></marker>
+    <style>
+      .box{fill:#0c1715;stroke:#29443c;stroke-width:2}.title{fill:#eefaf6;font:700 25px Inter,system-ui}.copy{fill:#8da39b;font:16px Inter,system-ui}.tag{fill:#70f0b6;font:700 13px ui-monospace,monospace;letter-spacing:2px}.arrow{stroke:#70f0b6;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1200" height="560" rx="28" fill="url(#bg)"/>
+  <text x="56" y="58" class="tag">DARWIN · CLOSED-LOOP ENGINEERING</text>
+  <rect x="330" y="88" width="540" height="112" rx="20" class="box"/>
+  <text x="370" y="133" class="title">Dashboard</text><text x="370" y="164" class="copy">React · Three.js · event fold · live / replay</text>
+  <rect x="330" y="252" width="540" height="118" rx="20" class="box"/>
+  <text x="370" y="298" class="title">Backend orchestrator</text><text x="370" y="329" class="copy">FastAPI · agents · baselines · budgets · recorder</text>
+  <rect x="54" y="424" width="326" height="92" rx="18" class="box"/>
+  <text x="82" y="463" class="title">Simulation</text><text x="82" y="490" class="copy">Aero · stability · flutter · mass</text>
+  <rect x="437" y="424" width="326" height="92" rx="18" class="box"/>
+  <text x="465" y="463" class="title">Agent team</text><text x="465" y="490" class="copy">Propose · critique · strategize</text>
+  <rect x="820" y="424" width="326" height="92" rx="18" class="box"/>
+  <text x="848" y="463" class="title">Onshape CAD</text><text x="848" y="490" class="copy">Configure · verify · commit · print</text>
+  <path d="M600 200V245" class="arrow" filter="url(#glow)"/><path d="M430 370L260 419" class="arrow"/><path d="M600 370V417" class="arrow"/><path d="M770 370L940 419" class="arrow"/>
+  <text x="625" y="229" class="copy">REST + WebSocket events</text>
+</svg>
