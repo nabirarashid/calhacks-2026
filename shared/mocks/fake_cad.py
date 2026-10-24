@@ -180,3 +180,54 @@ def preview_commit(manifest: ProjectManifest, params: Dict[str, ParamValue],
                          checks_planned=["read back values", "regenerate", "geometry sanity", "protected interfaces",
                                          "create version"], maturity=manifest.authority.maturity,
                          blocked_reason=blocked)
+
+
+# ---------------------------------------------------------------- Plan v4: Variable features (B.7)
+
+_VARIABLES = {}  # type: Dict[str, Dict[str, float]]      # document id -> {name: value}
+_VERSIONS = []  # type: List[str]
+
+
+def _doc_id(doc_url: str) -> str:
+    return doc_url.split("/documents/")[1].split("/")[0] if "/documents/" in doc_url else doc_url
+
+
+def list_variables(doc_url: str) -> Dict[str, Dict[str, object]]:
+    """In-memory Variables; a new document starts at the rear wing's defaults (or the fin's, for 'fin' URLs)."""
+    from shared.mocks import fake_wing
+    did = _doc_id(doc_url)
+    if did not in _VARIABLES:
+        if "fin" in doc_url.lower():
+            space = DesignSpace.model_validate_json((_FIXTURE_GEOMETRY.parent / "design_space_fin.json").read_text())
+        else:
+            space = fake_wing.WING_SPACE
+        _VARIABLES[did] = {p.name: float(p.default) for p in space.parameters if p.kind != "choice"}
+    return {n: {"feature_id": "Ffake_%s" % n, "expression": "%g" % v, "value": v, "unit": "", "type": "ANY"}
+            for n, v in _VARIABLES[did].items()}
+
+
+def apply_values(doc_url: str, params: Dict[str, ParamValue], units: Dict[str, str]) -> GeometryRef:
+    from shared.mocks.make_fixtures_v2 import _wing_stl
+    import hashlib
+    did = _doc_id(doc_url)
+    current = {n: v["value"] for n, v in list_variables(doc_url).items()}
+    missing = [n for n in params if n not in current]
+    key = hashlib.sha1((did + json.dumps(dict(params), sort_keys=True)).encode()).hexdigest()[:12]
+    if missing:
+        return GeometryRef(geometry_key=key, status="failed", source="mock", regen_status="NOT_ATTEMPTED",
+                           error="no Variable feature named %s" % ", ".join(sorted(missing)))
+    changed = {n: float(v) for n, v in params.items() if abs(float(v) - float(current[n])) > 1e-9}
+    if not _charge(len(changed) + 2):
+        return GeometryRef(geometry_key=key, status="skipped", source="none", error="onshape_budget_reserve")
+    _VARIABLES[did].update(changed)
+    merged = dict(_VARIABLES[did])
+    stl = _wing_stl(merged) if "span_mm" in merged else fin_geometry.prism_stl(merged, name=key)
+    (cache_dir() / ("%s.stl" % key)).write_text(stl)
+    return GeometryRef(geometry_key=key, status="ready", source="mock", stl_url="/api/geometry/%s.stl" % key,
+                       onshape_calls=len(changed) + 2, regen_status="OK", elapsed_ms=450.0)
+
+
+def create_version(doc_url: str, name: str) -> Optional[str]:
+    _charge(1)
+    _VERSIONS.append(name)
+    return "fakever%d" % len(_VERSIONS)

@@ -20,7 +20,9 @@ from shared.manifest import ManifestUpdate, ProjectManifest
 from backend import evidence, llm, replay
 from backend.agents import goal_parser
 from backend.bus import Bus, runs_dir
+from backend.investigator import Investigator
 from backend.run_loop import RunController, new_run_id
+from backend.sessions import make_router
 from backend.wiring import ROOT, Wiring
 
 logging.basicConfig(level=os.environ.get("DARWIN_LOG", "INFO"), format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -218,7 +220,8 @@ def start_run(req: StartRunRequest) -> Dict[str, str]:
 
 
 def _active() -> List[Any]:
-    return [getattr(r, "summary", None) for r in RUNS.values() if isinstance(r, RunController) and r.thread.is_alive()]
+    return [getattr(r, "summary", None) for r in RUNS.values()
+            if isinstance(r, (RunController, Investigator)) and r.thread.is_alive()]
 
 
 @app.get("/api/runs")
@@ -381,7 +384,7 @@ def report(run_id: str) -> HTMLResponse:
 @app.get("/api/budget")
 def budget() -> Dict[str, Any]:
     for r in reversed(list(RUNS.values())):
-        if isinstance(r, RunController):
+        if isinstance(r, (RunController, Investigator)):
             return r.budget_status().model_dump(mode="json")
     return BudgetStatus(onshape=W.cad.budget_status(),
                         model=ModelBudget(provider=llm.provider_name(), calls_run=0, calls_cap_run=0, spend_run_usd=0.0,
@@ -400,6 +403,11 @@ def discover(req: DiscoverRequest) -> Dict[str, Any]:
     except Exception as e:  # noqa: BLE001
         raise HTTPException(502, "discovery failed: %s" % e)
     return W.public_space(space).model_dump(mode="json")
+
+
+# ------------------------------------------------------------------ sessions (Plan v4, B.6)
+
+app.include_router(make_router(W, BUS, RUNS, lambda: any(s is not None and s.status == "running" for s in _active())))
 
 
 # ------------------------------------------------------------------ websocket

@@ -50,6 +50,15 @@ class _OffCad:
     def export_print_package(self, space: DesignSpace, params: Dict[str, ParamValue], out_dir: Path) -> Path:
         return self._fake.export_print_package(space, params, out_dir)
 
+    def list_variables(self, doc_url: str) -> Dict[str, Dict[str, object]]:
+        raise RuntimeError("CAD is off")
+
+    def apply_values(self, doc_url: str, params: Dict[str, ParamValue], units: Dict[str, str]) -> GeometryRef:
+        return GeometryRef(geometry_key="off", status="skipped", source="none", error="cad_off")
+
+    def create_version(self, doc_url: str, name: str) -> Optional[str]:
+        return None
+
 
 class Wiring:
     def __init__(self) -> None:

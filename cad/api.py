@@ -285,3 +285,23 @@ def export_print_package(space: DesignSpace, params: Dict[str, ParamValue],
 
 def discover_design_space(doc_url: str, probe: bool = False) -> DesignSpace:
     raise NotImplementedError("auto-discovery lands with Tier 3")
+
+
+# ---- Plan v4: Variable features (the live morph). Thin wrappers over cad.variables (B.7). ----
+
+def list_variables(doc_url: str) -> Dict[str, Dict[str, object]]:
+    """Live Variable values in the document's Part Studio. 1 call. Raises OnshapeError on HTTP failure."""
+    from cad import variables
+    return variables.list_variables(doc_url)
+
+
+def apply_values(doc_url: str, params: Dict[str, ParamValue], units: Dict[str, str]) -> GeometryRef:
+    """Write changed params into their Variable features so open tabs morph. Never raises."""
+    from cad import variables
+    return variables.apply_values(doc_url, params, units)
+
+
+def create_version(doc_url: str, name: str) -> Optional[str]:
+    """Named version of the workspace; None if refused or failed."""
+    from cad import variables
+    return variables.create_version(doc_url, name)
