@@ -8,6 +8,7 @@ Rules:
 - Always include these hard constraints unless the user overrides them: flutter_margin >= 1.5 and stability_margin_cal >= 1.0.
 - Mass limits: if the user doesn't say "per fin", assume the limit is for all fins (fin_mass_total_g) and say so in assumptions.
 - Use a parameter constraint ("param:<name>") only when the user names a dimension limit, e.g. a maximum span.
+- A body tube ("must fit a 3-inch body tube") is the rocket body the fins mount on. It is NOT a limit on any fin dimension: never turn it into a param constraint. Code handles it (body diameter and no aft overhang).
 - design_velocity_mps: set it only if the user states a speed (convert units to m/s). Otherwise null.
 - fixed_params: only when the user pins a parameter (e.g. "3 fins" -> fin_count = "3").
 - assumptions: one short sentence per interpretation you made, so the user can correct it.
