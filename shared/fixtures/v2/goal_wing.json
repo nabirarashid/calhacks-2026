@@ -1,5 +1,5 @@
 {
-  "source_text": "More downforce without going over 15 N of drag at 25 m/s. You can change the angle, span, flap and endplates. Keep the chord.",
+  "source_text": "More downforce without going over 15 N of drag at 25 m/s. You can change the angle, span, flap angle, flap size and endplates. Keep the chord.",
   "objectives": [
     {
       "metric": "downforce_n",

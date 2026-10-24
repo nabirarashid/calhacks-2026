@@ -46,3 +46,63 @@ def test_no_tube_phrase_changes_nothing():
     g = to_goal(_llm([]), "Keep drag low and stay under 40 g", SPACE, CATALOG)
     assert "aft_overhang_mm" not in [c.ref for c in g.constraints]
     assert g.context_overrides == {}
+
+
+def _wing():
+    from backend.wiring import Wiring
+    import os
+    os.environ.setdefault("DARWIN_SIM", "real")
+    w = Wiring()
+    return w.resolve("rear_wing")
+
+
+def test_editable_from_explicit_permission_and_keep():
+    from backend.agents.goal_parser import resolve_editable
+    space = _wing()
+    ed, note = resolve_editable("More downforce under 15 N of drag. You can change the angle, span and flap. "
+                                "Keep the mounts and endplates.", space, None, {})
+    assert ed == ["aoa_deg", "span_mm", "flap_angle_deg"]             # "flap" alone = the flap angle
+    assert "endplate_height_mm" in note and "chord_mm" in note        # both held fixed
+    ed, _ = resolve_editable("Only change the flap angle.", space, None, {})
+    assert ed == ["flap_angle_deg"]                                    # "flap angle" beats "flap" and "angle"
+    ed, _ = resolve_editable("Make it more efficient but keep the chord and the span.", space, None, {})
+    assert "chord_mm" not in ed and "span_mm" not in ed and "aoa_deg" in ed
+
+
+def test_llm_suggestion_used_only_without_explicit_phrases_and_never_overrides_keep():
+    from backend.agents.goal_parser import resolve_editable
+    space = _wing()
+    ed, _ = resolve_editable("Tweak whatever helps the tip vortex; leave the chord alone.", space,
+                             ["endplate_height_mm", "chord_mm"], {})
+    assert ed == ["endplate_height_mm"]                                # chord was kept
+    ed, _ = resolve_editable("You can change the span.", space, ["aoa_deg", "flap_angle_deg"], {})
+    assert ed == ["span_mm"]                                           # explicit phrase wins over the LLM
+    ed, note = resolve_editable("More downforce please.", space, None, {})
+    assert ed is None and "every parameter" in note
+
+
+def test_fin_prompts_use_the_fin_aliases():
+    from backend.agents.goal_parser import resolve_editable
+    from backend.wiring import Wiring
+    space = Wiring().resolve("fin_reference")
+    ed, _ = resolve_editable("Make it lighter, but keep the span and the sweep.", space, None, {})
+    assert "semi_span" not in ed and "sweep_deg" not in ed and "thickness" in ed
+    ed, _ = resolve_editable(PITCH, space, None, {})                   # "keep drag low", "keep it under 40 g"
+    assert ed is None
+
+
+def test_invented_pins_are_dropped_and_stated_pins_kept():
+    space = _wing()
+    from backend.wiring import Wiring
+    cat = Wiring().catalog(space.scorer)
+    text = "More downforce under 15 N of drag. You can change the angle and span. Keep the endplates."
+    data = {"objectives": [{"metric": "downforce_n", "direction": "maximize", "weight": 1}],
+            "constraints": [{"ref": "drag_n", "op": "<=", "value": 15, "hard": True}],
+            "fixed_params": [{"name": "endplate_height_mm", "value": "300"}],      # invented by the model
+            "assumptions": ["endplate_height_mm pinned at 300 mm."], "editable": []}
+    g = to_goal(data, text, space, cat)
+    assert g.fixed_params == {} and "endplate_height_mm" not in (g.editable or [])
+    assert not any("300" in a for a in g.assumptions)
+    stated = dict(data, fixed_params=[{"name": "aoa_deg", "value": "8"}])
+    g2 = to_goal(stated, text + " Start with the angle at 8 degrees.", space, cat)
+    assert g2.fixed_params == {"aoa_deg": 8.0}

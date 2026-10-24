@@ -37,6 +37,13 @@ class RocketFinPack:
     ]
     sources = [SourceRef(kind="project_doc", source_id="sim/PHYSICS.md", title="Darwin fin physics")]
     renderer = "fin_morph"
+    # Words users say -> parameters (the goal parser's deterministic "you can change X" reading).
+    param_aliases = {
+        "root chord": ["root_chord"], "chord": ["root_chord"], "taper": ["taper_ratio"],
+        "semi span": ["semi_span"], "span": ["semi_span"], "height": ["semi_span"], "sweep": ["sweep_deg"],
+        "thickness": ["thickness"], "fin count": ["fin_count"], "number of fins": ["fin_count"],
+        "edge": ["edge_profile"],
+    }
 
     def signature_match(self, inv: CadInventory) -> float:
         names = {c.id.lower() for c in inv.config_inputs} | {c.name.lower() for c in inv.config_inputs}

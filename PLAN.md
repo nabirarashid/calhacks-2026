@@ -358,7 +358,7 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 
 ## Part C: The four sections
 
-**Progress (Sat 15:35):** done: A1, B1, B2, B3, B4, C1, C2. The investigator runs end to end on the
+**Progress (Sat 15:45):** done: A1, B1, B2, B3, B4, C1, C2, C3. The investigator runs end to end on the
 real rear-wing solver (CP-C's terminal criterion is met). **Not yet visible in git:** anything from
 W-A (A2 wing Part Studio) or W-D (D1 extension). W-C is taking A3 (`cad/variables.py`) after C3,
 with the team's OK.
@@ -476,7 +476,7 @@ The structural/FEA work is parked: leave the files, stop work.
   - plan / run / score / analyze / decide / learn (B.3)
   - validation of LLM output; rules fallback; stop rules
   - every event in B.4
-- [ ] **C3 (by 19:00) Goal parser** emits `editable` ("you can change the angle, span and flap"
+- [x] **C3 (by 19:00) Goal parser** ✅ *done 15:45 (W-C): explicit phrases decide, the LLM only fills unusual wording, invented pins dropped* emits `editable` ("you can change the angle, span and flap"
   → `aoa_deg`, `span_mm`, `flap_angle_deg`, `flap_chord_frac`) and holds everything else
   fixed. Assumptions are listed for the user.
 - [ ] **C4 (by 21:30) Session API** (B.6), with `cad.variables` on each accepted step, the

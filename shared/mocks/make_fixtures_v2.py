@@ -411,7 +411,7 @@ def sample_structural_run(m: ProjectManifest) -> List[dict]:
 
 WING_GOAL = Goal(
     source_text="More downforce without going over 15 N of drag at 25 m/s. You can change the angle, span, "
-                "flap and endplates. Keep the chord.",
+                "flap angle, flap size and endplates. Keep the chord.",
     objectives=[Objective(metric="downforce_n", direction="maximize", weight=1.0)],
     constraints=[Constraint(ref="drag_n", op="<=", value=15.0, label="Drag <= 15 N"),
                  Constraint(ref="stall_margin_deg", op=">=", value=2.0, label="Stall margin >= 2 deg")],

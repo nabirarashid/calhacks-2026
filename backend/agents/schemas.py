@@ -64,6 +64,7 @@ def goal_schema(space: DesignSpace, catalog: List[MetricInfo]) -> Dict[str, Any]
         "objectives": {"type": "array", "items": objective},
         "constraints": {"type": "array", "items": constraint},
         "fixed_params": {"type": "array", "items": fixed},
+        "editable": _str_list([p.name for p in space.parameters]),
         "assumptions": _str_list(),
     }
     if "design_velocity_mps" in space.context:     # only domains that have a design velocity

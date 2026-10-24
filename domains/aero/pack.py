@@ -47,6 +47,16 @@ class AeroPack:
     ]
     sources = [SourceRef(kind="project_doc", source_id="domains/aero/principles.md", title="Darwin aero principles")]
     renderer = None
+    # Words users say -> parameters (the goal parser's deterministic "you can change X" reading).
+    param_aliases = {
+        "angle of attack": ["aoa_deg"], "aoa": ["aoa_deg"], "angle": ["aoa_deg"], "incidence": ["aoa_deg"],
+        "pitch": ["aoa_deg"], "span": ["span_mm"], "width": ["span_mm"], "chord": ["chord_mm"],
+        "flap angle": ["flap_angle_deg"], "flap deflection": ["flap_angle_deg"],
+        "flap chord": ["flap_chord_frac"], "flap size": ["flap_chord_frac"],
+        "flap": ["flap_angle_deg"],          # conservative: resizing the flap needs "flap chord"/"flap size"
+        "endplate": ["endplate_height_mm"],
+        "end plate": ["endplate_height_mm"],
+    }
 
     @property
     def prompt_fragment(self) -> str:

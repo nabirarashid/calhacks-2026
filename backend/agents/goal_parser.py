@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from shared.contracts import Constraint, DesignSpace, Goal, MetricInfo, ModelResult, Objective, Preset
 
 from backend import llm
-from backend.agents.base import _packs, compact_specs, system_prompt, user_message
+from backend.agents.base import _packs, compact_specs, system_prompt, unverified_numbers, user_message
 from backend.agents.schemas import goal_schema
 
 
@@ -18,6 +18,66 @@ def _cast(space: DesignSpace, name: str, value: str) -> Any:
     if value not in (p.choices or []):
         raise ValueError("invalid choice %r for %s" % (value, name))
     return value
+
+
+_ALLOW = re.compile(r"\b(?:(?:you\s+)?(?:can|may|could|are\s+allowed\s+to|feel\s+free\s+to|free\s+to)\s+"
+                    r"(?:only\s+)?(?:change|adjust|vary|modify|tweak|edit|play\s+with|move)|only\s+(?:change|adjust|"
+                    r"vary|modify|tweak|touch))\b([^.;!?]*)", re.I)
+_KEEP = re.compile(r"\b(?:keep|leave|hold|fix|freeze|don'?t\s+(?:change|touch|move)|do\s+not\s+(?:change|touch|move)|"
+                   r"without\s+changing|must\s+not\s+change)\b([^.;!?]*)", re.I)
+
+
+def _aliases(space: DesignSpace) -> List[Tuple[str, List[str]]]:
+    """(phrase, params) pairs, longest phrase first. Domain packs supply them; param names are the fallback."""
+    names = [p.name for p in space.parameters]
+    table = dict(getattr(_packs.get(space.id), "param_aliases", {}) or {})
+    for n in names:
+        base = re.sub(r"_(deg|mm|frac)$", "", n).replace("_", " ")
+        table.setdefault(base, [n])
+    pairs = [(phrase.lower(), [p for p in params if p in names]) for phrase, params in table.items()]
+    return sorted([pp for pp in pairs if pp[1]], key=lambda pp: -len(pp[0]))
+
+
+def _params_in(span: str, aliases: List[Tuple[str, List[str]]]) -> List[str]:
+    found, text = [], " %s " % span.lower()
+    for phrase, params in aliases:
+        pattern = r"(?<![a-z])%ss?(?![a-z])" % re.escape(phrase)
+        if re.search(pattern, text):
+            found += params
+            text = re.sub(pattern, " ", text)        # consume, so "flap chord" doesn't also match "chord"
+    return list(dict.fromkeys(found))
+
+
+def infer_editable(text: str, space: DesignSpace) -> Tuple[List[str], List[str]]:
+    """Deterministic reading of "you can change X, Y" and "keep Z" -> (allowed, kept)."""
+    aliases = _aliases(space)
+    allowed = [p for m in _ALLOW.finditer(text) for p in _params_in(m.group(1), aliases)]
+    kept = [p for m in _KEEP.finditer(text) for p in _params_in(m.group(1), aliases)]
+    return list(dict.fromkeys(allowed)), list(dict.fromkeys(kept))
+
+
+def resolve_editable(text: str, space: DesignSpace, llm_editable: Optional[List[str]],
+                     fixed: Dict[str, Any]) -> Tuple[Optional[List[str]], str]:
+    """Which params may Darwin change? Explicit phrases win; the LLM only fills in unusual wording.
+
+    Returns (editable or None for "all not fixed", an assumption sentence for the user to confirm).
+    """
+    names = [p.name for p in space.parameters]
+    allowed, kept = infer_editable(text, space)
+    kept = list(dict.fromkeys(kept + list(fixed)))
+    if allowed:
+        editable = [n for n in names if n in allowed and n not in kept]
+    elif llm_editable:
+        editable = [n for n in names if n in llm_editable and n not in kept]
+    elif kept:
+        editable = [n for n in names if n not in kept]
+    else:
+        return None, "You didn't limit what may change, so Darwin may adjust every parameter."
+    if not editable:
+        raise ValueError("no parameter is left to change after applying the request's limits")
+    held = [n for n in names if n not in editable]
+    return editable, "Darwin may change %s; it holds %s fixed." % (
+        ", ".join(editable), ", ".join(held) if held else "nothing")
 
 
 def to_goal(data: Dict[str, Any], text: str, space: DesignSpace, catalog: List[MetricInfo]) -> Goal:
@@ -49,19 +109,32 @@ def to_goal(data: Dict[str, Any], text: str, space: DesignSpace, catalog: List[M
             raise ValueError("constraint on unknown ref %r" % ref)
         constraints.append(Constraint(ref=ref, op=c["op"], value=float(c["value"]), hard=bool(c.get("hard", True)),
                                       label=str(c.get("label", ""))))
-    fixed = {f["name"]: _cast(space, f["name"], str(f["value"])) for f in data.get("fixed_params", [])}
+    fixed, dropped = {}, []  # type: Dict[str, Any], List[str]
+    for f in data.get("fixed_params", []):
+        # A pin needs a value the user actually stated ("3 fins"). "Keep the endplates" means hold them
+        # at their current value, so an invented value is dropped (Sat 15:40: Haiku pinned 300 mm).
+        stated = (not unverified_numbers(str(f["value"]), text)) if re.search(r"\d", str(f["value"])) \
+            else str(f["value"]).lower() in text.lower()
+        if stated:
+            fixed[f["name"]] = _cast(space, f["name"], str(f["value"]))
+        else:
+            dropped.append(f["name"])
     overrides = {}  # type: Dict[str, Any]
     if data.get("design_velocity_mps") is not None:
         v = float(data["design_velocity_mps"])
         if not 10.0 <= v <= 400.0:
             raise ValueError("design_velocity_mps %.0f is outside the subsonic model's range (10-400 m/s)" % v)
         overrides["design_velocity_mps"] = v
-    assumptions = [str(a) for a in data.get("assumptions", [])][:6]
+    assumptions = [str(a) for a in data.get("assumptions", [])
+                   if not any(name in str(a) for name in dropped)][:6]
     rules = getattr(_packs.get(space.id), "goal_rules", None)
     if rules is not None:      # deterministic domain rules (e.g. rocket_fin's body-tube reading)
         constraints = rules(text, space, constraints, overrides, assumptions)
+    llm_editable = [n for n in data.get("editable") or [] if n in params]
+    editable, note = resolve_editable(text, space, llm_editable, fixed)
+    assumptions = [note] + assumptions[:5]
     return Goal(source_text=text, objectives=objectives, constraints=constraints, fixed_params=fixed,
-                context_overrides=overrides, assumptions=assumptions, parsed_by="llm")
+                editable=editable, context_overrides=overrides, assumptions=assumptions, parsed_by="llm")
 
 
 def compatible_presets(presets: List[Preset], catalog: List[MetricInfo]) -> List[Preset]:
