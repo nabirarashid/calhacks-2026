@@ -1,12 +1,402 @@
 # Darwin: build plan (Cal Hacks 13.0)
 
-## Active implementation plan — engineering-change handoff (Sat Oct 24)
+## Roadmap v2 — object-onboarding engineering-change agent (authoritative)
 
-This section is the current execution plan and overrides later Tier 3/stretch
-language where the two conflict. The fin remains the single judged object. The
-goal is to finish the missing review, approval, evidence, and honest Onshape
-handoff around the working optimization loop; a drone arm, structural FEA,
-arbitrary feature generation, and a second scorer are post-hackathon work.
+This is the current plan. The original hackathon plan and the completed Oct 24
+checkpoint remain below as historical design context; where they conflict with
+this roadmap, this section wins.
+
+**Roadmap baseline:** `main` was at `c013487`, synchronized with `origin/main`,
+when this roadmap was written. The verified suite is 112 Python tests and 18 dashboard tests;
+the production dashboard build, contract check, secrets scan, and diff check
+pass. The fin workflow has live read-only Onshape verification and mocked write
+verification. No live Onshape write has been attempted.
+
+### 1. Product definition and honest boundary
+
+Darwin is an engineering-change agent for **supported parametric projects**. It
+inspects an existing CAD model, turns an engineering request into explicit and
+reviewable requirements, makes bounded changes, runs validated engineering
+tools, diagnoses failures, and prepares a revision plus evidence for approval.
+
+The near-term product claim is:
+
+> Darwin can onboard a parameterized Onshape project that matches an installed,
+> validated domain pack and solver adapter, after an engineer supplies and
+> approves the required engineering inputs.
+
+“Works with any object” must not mean that an LLM can infer arbitrary physics
+from shape. New-object support and new-domain support are separate:
+
+- **New object, supported domain:** mostly a manifest/onboarding problem. For
+  example, a new bracket can reuse a validated static-structural adapter.
+- **New domain or physics:** requires a new validated solver adapter and domain
+  pack. General LLM knowledge is not a substitute.
+- **Unparameterized or semantically opaque CAD:** Darwin may inventory it and
+  explain missing prerequisites, but it cannot promise safe modification.
+
+The fin remains the first validated adapter and primary regression/demo project.
+The second adapter proves transfer; it does not by itself prove universality.
+
+### 2. Support maturity levels
+
+Every project has an explicit maturity level. The UI and reports must display
+it; capabilities never silently exceed it.
+
+| Level | Meaning | Permitted behavior |
+|---|---|---|
+| 0 — unsupported | CAD/domain cannot be interpreted safely | Explain blockers only |
+| 1 — inventory-only | CAD parameters/features can be inspected | Read-only inventory and draft manifest |
+| 2 — manifest-reviewed | Engineer approved semantics, materials, loads and constraints | Read-only probes and planning |
+| 3 — solver-ready | Validated adapter accepts the manifest and baseline checks pass | Simulation and bounded optimization |
+| 4 — write-enabled | Isolated workspace, recovery plan and evidence gates are approved | Apply, read back, verify and version |
+
+Moving between levels requires recorded evidence, not an LLM confidence score.
+
+### 3. Non-negotiable engineering and safety rules
+
+1. **The LLM does not determine physical truth.** It parses intent, proposes
+   strategies, selects from registered tools, asks questions and explains
+   results. Solvers and deterministic code own units, arithmetic, requirement
+   evaluation and pass/fail.
+2. **Do not infer authoritative inputs from geometry.** Loads, fixtures,
+   contacts, materials, allowables, safety factors, manufacturing process,
+   operating environment and acceptance criteria require sourced project data
+   or engineer confirmation.
+3. **Fail closed.** Missing inputs, unsupported parameters, stale revisions,
+   solver non-convergence, geometry mismatch, out-of-domain conditions or
+   incomplete evidence produce `blocked`/`unsupported`, never a fabricated pass.
+4. **Bind evidence to exact state.** Every result identifies the CAD
+   document/workspace/element and source microversion, project-manifest revision,
+   parameter hash, solver/adapter version, solver settings, assumptions, source
+   documents and artifacts.
+5. **Approval is exact and expires on change.** Approval binds the design,
+   manifest revision, CAD revision, solver configuration and evidence package.
+6. **Writes are separate from approval.** Show a diff and cost/action preview;
+   require an explicit commit action to an acknowledged isolated workspace;
+   then read back, regenerate, verify and create a version.
+7. **Simulation is evidence, not certification.** Reports label screening,
+   validated and high-fidelity results accurately and state applicability,
+   uncertainty and known limitations.
+8. **Treat all imported text as untrusted.** CAD names, comments, drawings and
+   retrieved documents can contain prompt injection; they are data, never tool
+   instructions.
+
+### 4. Core project artifact: `ProjectManifest`
+
+Onboarding produces a versioned, immutable manifest. The existing `DesignSpace`
+becomes the optimizer-facing subset rather than the complete project definition.
+
+The manifest must include:
+
+- Identity: project ID, schema version, manifest revision and owner.
+- CAD binding: provider, document/workspace/element references, source revision,
+  target parts/assemblies and export recipe.
+- Design variables: typed IDs, units, defaults, ranges, dependencies, discrete
+  choices, editable/fixed/protected status and allowed operations.
+- Protected intent: mounting interfaces, envelopes, clearances, datum frames,
+  installation constraints and semantic features that must remain unchanged.
+- Engineering context: domain pack, material, process, environment, load cases,
+  fixtures, contacts, safety factors and prohibited assumptions.
+- Requirements: objectives, hard constraints, margins, manufacturing rules and
+  the deterministic evaluator responsible for each one.
+- Analysis plan: fast and verification adapters, validity envelope, meshing and
+  convergence policy, resource limits and expected metrics/artifacts.
+- Verification plan: geometry health, protected-interface, mass/volume,
+  clearance, solver-quality and result assertions.
+- Authority: maturity level, permitted actions, required approvals, isolated
+  write target, API/cost limits and recovery procedure.
+- Provenance: source documents and versions, citations, extracted candidates,
+  human answers, assumptions, review history and adapter versions.
+
+Manifest changes create a new revision and invalidate downstream approvals.
+
+### 5. Target interfaces
+
+The core orchestrator composes registered capabilities by stable ID. The LLM
+cannot load arbitrary generated code or invent an adapter name.
+
+**`CadAdapter`**
+
+- `inspect(source) -> CadInventory`
+- `validate_manifest(manifest) -> findings/blockers`
+- `export(manifest, params) -> CAD artifact + revision evidence`
+- `apply(manifest, params, approval) -> read-back/version evidence`
+- Declares support for configuration quantities/lists, features, assemblies,
+  exports, branching and writes.
+
+**`SolverAdapter`**
+
+- Declares domain, required manifest fields, metrics, units, fidelity levels,
+  validity envelope, solver/version and uncertainty semantics.
+- `validate_manifest`, `prepare`, `run`, `parse`, `evaluate_requirements`,
+  `convergence_check` and `explain_validity`.
+- Runs with time/resource limits and returns diagnostics plus raw artifacts.
+
+**`GeometryVerifier`**
+
+- Generic checks: parseability, units/scale, nonzero volume, watertightness,
+  bounds and expected part count.
+- Project checks: protected interfaces, datums, envelopes, clearances, mass or
+  volume bands and required features.
+
+**`DomainPack`**
+
+- Required question set and manifest schema extensions.
+- Approved solver/verifier adapters and prompt fragments.
+- Curated standards, material/process data and design-rule checks.
+- Applicability, version, jurisdiction, licensing and citation metadata.
+
+**`KnowledgeProvider`**
+
+- Retrieves only from approved project and domain sources.
+- Returns source/version/section with every result and flags conflicts or stale
+  material instead of resolving them silently.
+- Cannot directly create pass/fail evidence; a cited rule must be converted to
+  and approved as a typed requirement first.
+
+### 6. Agentic onboarding workflow
+
+1. **Inspect read-only.** Inventory elements, parts, configuration inputs,
+   features, units, ranges, mass properties, revisions and export capability.
+2. **Classify capability.** Match only against registered CAD and domain-pack
+   capabilities; otherwise remain inventory-only.
+3. **Draft semantics.** Propose editable parameters, aliases, protected
+   interfaces and likely dependencies with confidence and provenance.
+4. **Collect missing engineering inputs.** Ask the smallest set of blocking
+   questions. Never default loads, fixtures, material allowables or safety
+   factors invisibly.
+5. **Generate manifest and analysis plan.** Include assumptions, citations,
+   unsupported requests, cost estimate and intended actions.
+6. **Engineer review.** Confirm parameter meaning, protected geometry, solver,
+   load cases, requirements and permitted autonomy.
+7. **Probe safely.** Regenerate the seed and bounded min/max/interior cases;
+   detect invalid combinations, dependencies, stale exports and unit errors.
+8. **Validate the baseline.** Reproduce known geometry/results, run solver
+   quality checks and establish expected metric directions/sensitivities.
+9. **Activate the project.** Record maturity level and immutable manifest. Only
+   solver-ready projects can optimize; only write-enabled projects can commit.
+10. **Execute the existing Darwin loop.** Request → typed requirements → bounded
+    candidates → cheap deterministic checks → simulations → diagnosis/refinement
+    → evidence → approval → separate commit.
+
+An unsupported onboarding attempt must still produce a useful capability report
+listing what Darwin found, what is missing and which adapter would be required.
+
+### 7. Engineering knowledge and model strategy
+
+Use a capable general model with structured tools and retrieval. Do **not** train
+an “engineering truth model” initially.
+
+Knowledge precedence is:
+
+1. Approved project requirements and drawings.
+2. Engineer-confirmed manifest fields and company rules.
+3. Versioned standards and authoritative material/process records.
+4. Validated solver outputs and deterministic calculations.
+5. General model knowledge, used only to suggest questions or strategies.
+
+Domain packs should be versioned, cited and evaluated for regional applicability,
+freshness and licensing. Conflicting sources are surfaced for review. Proprietary
+standards and customer documents require explicit storage and model-provider
+policies.
+
+Fine-tuning is considered only after reviewed runs reveal measurable recurring
+errors and an evaluation set exists. Appropriate targets are intent parsing,
+clarifying-question selection, tool selection and strategy ranking. Fine-tuning
+must never replace solver execution, standards retrieval, units, calculations or
+safety evaluation. Customer data is not used for training without explicit
+permission.
+
+### 8. Roadmap and acceptance gates
+
+#### Phase 0 — finish and freeze the fin reference workflow
+
+- [x] Deterministic evidence, engineering diff and failure-to-correction review.
+- [x] Exact-design human approval and audit record.
+- [x] Guarded Onshape update/read-back/geometry/version sequence under mocks.
+- [x] Live read-only Onshape schema preflight.
+- [x] Constrain live `edge_profile` to the square geometry actually supported.
+- [ ] Execute one controlled live write in a disposable workspace.
+- [ ] Define and test partial-write recovery or explicit manual recovery steps.
+- [ ] Add a post-approval **Create Onshape Version** UI action with confirmation,
+  action preview and result evidence.
+- [ ] Run one complete real demo, inspect the evidence package and rehearse the
+  two-minute flow; preserve a reliable replay.
+
+**Gate:** the fin workflow can make, verify and version an approved change
+without hidden manual repair, or it remains accurately labeled read-only.
+
+#### Phase 1 — extract the reusable platform
+
+- [ ] Add versioned `ProjectManifest`, `CadInventory`, `GeometryEvidence`,
+  `AnalysisArtifact` and adapter-capability contracts.
+- [ ] Replace the singleton fin loader with a project/adapter registry.
+- [ ] Remove the `fin_v1` default switch and enable safe parallel execution for
+  any registered thread/process-safe solver.
+- [ ] Split generic STL parsing/health from the fin `GeometryVerifier`.
+- [ ] Replace `DARWIN_FIN_DOC_URL` with project-scoped CAD bindings and secret
+  references; keep document IDs out of prompts, logs and public responses.
+- [ ] Move fin geometry, physics, prompts, requirements and optional renderer
+  behind a `rocket_fin` domain pack.
+- [ ] Make evidence and approval bind manifest, CAD and solver revisions.
+- [ ] Replace the mandatory `FinHero` path with an STL-first generic viewer;
+  retain the morphing fin preview as an optional renderer plugin.
+- [ ] Build an adapter conformance harness and negative capability tests.
+
+**Gate:** the fin demo passes unchanged through public interfaces, and core
+orchestration/CAD/evidence code imports no fin-specific geometry or metrics.
+
+#### Phase 2 — read-only onboarding MVP
+
+- [ ] Implement Onshape inspection for configurations, parts/features, units,
+  ranges, mass properties, revisions and supported exports.
+- [ ] Generate and persist draft manifests plus blocking-question lists.
+- [ ] Build a manifest review UI for semantics, protected interfaces,
+  assumptions, sources, solver selection and permitted actions.
+- [ ] Run bounded regeneration probes and detect dependencies/invalid ranges.
+- [ ] Return capability reports for unsupported objects instead of forcing the
+  fin scorer or returning a generic error.
+- [ ] Add revision drift detection and require re-review after CAD changes.
+
+**Gate:** two unfamiliar parameterized Onshape models can reach inventory-only
+or manifest-reviewed status without object-specific core-code changes; neither
+can optimize until a compatible validated domain pack is approved.
+
+#### Phase 3 — second validated domain: static structures
+
+Default candidate: a controlled drone arm or bracket with named mounting
+interfaces and an engineer-reviewed load case. CalculiX is a candidate solver,
+not a decision until a validation spike passes.
+
+- [ ] Define the structural domain pack: material provenance, fixtures, loads,
+  contacts, safety factors, stress/deflection metrics and manufacturing rules.
+- [ ] Implement STEP/mesh/solve/parse artifacts and deterministic units.
+- [ ] Add mesh-quality and convergence checks, singularity handling and a clear
+  linear-static validity envelope.
+- [ ] Validate against analytical cases and independently reviewed references.
+- [ ] Add protected-hole/interface, envelope, clearance and minimum-thickness
+  geometry checks.
+- [ ] Demonstrate a failed lightweight candidate followed by a verified repair.
+- [ ] Onboard and optimize the second object through the generic workflow.
+
+**Gate:** a non-fin project is onboarded without changes to the shared run loop;
+missing loads/materials/fixtures block execution; results are reproducible and
+traceable; an approved change can be versioned in an isolated workspace.
+
+#### Phase 4 — engineering knowledge layer
+
+- [ ] Add versioned domain packs for standards, materials, processes and solver
+  setup guidance with citations, licensing and applicability metadata.
+- [ ] Ingest approved project documents with tenant/project isolation,
+  retention/deletion controls and prompt-injection defenses.
+- [ ] Require source/version citations for engineering recommendations and show
+  conflicts or gaps in the review UI.
+- [ ] Evaluate requirement extraction, clarification quality, unsafe-inference
+  refusal, adapter selection and failure diagnosis on a reviewed corpus.
+- [ ] Collect engineer corrections and outcomes for later model improvement.
+
+**Gate:** recommendations are traceable to approved sources, and missing or
+conflicting knowledge cannot silently become a requirement or pass/fail rule.
+
+#### Phase 5 — production hardening and expansion
+
+- [ ] Durable job state, resumable solver runs, retries, idempotency and
+  cancellation for long-running analyses and approval pauses.
+- [ ] Sandboxed solver execution, resource limits, artifact storage, malware/file
+  validation and reproducible environment/version capture.
+- [ ] Role-based access, tenant isolation, encrypted secrets, audit export,
+  retention/deletion policy and model-provider data controls.
+- [ ] Workspace transaction/recovery semantics and concurrent-edit protection.
+- [ ] Usage/cost controls for CAD, solver compute, storage and models.
+- [ ] Add domains only through adapter validation and reference suites.
+- [ ] Add another CAD system only after Onshape onboarding is reliable.
+- [ ] Consider fine-tuning only after eval-backed evidence shows it is needed.
+
+### 9. Definition of “supports a new object”
+
+A new object is supported only when all applicable statements are true:
+
+- It is onboarded without changing the shared run loop.
+- Editable and protected parameters are explicit, typed and engineer-approved.
+- Required materials, loads, fixtures, contacts, environment and manufacturing
+  assumptions are complete or execution is blocked.
+- A registered solver adapter accepts the manifest within its declared validity
+  envelope and returns the required metrics/artifacts.
+- Seed and probe CAD regeneration pass generic and project-specific checks.
+- Baseline solver results pass independent reference, sensitivity and quality
+  checks appropriate to the domain.
+- Requirements are deterministic, unit-safe and linked to evidence.
+- Optimization is limited to manifest-permitted operations and ranges.
+- Every result is traceable to exact CAD, manifest, solver and source versions.
+- Approval and write permissions bind the exact reviewed state.
+- Apply → read-back → export → verify → version succeeds in an isolated target.
+- Negative paths clearly return unsupported, blocked, non-converged or failed.
+
+Anything less is a useful onboarding stage, not full object support.
+
+### 10. Principal risks and mitigations
+
+| Risk | Failure mode | Required mitigation |
+|---|---|---|
+| Universal-product overclaim | Geometry is mistaken for engineering understanding | Publish support levels and adapter/domain requirements |
+| Wrong problem definition | Plausible simulation of the wrong loads or constraints | Engineer-confirmed manifest and blocking questions |
+| Invalid solver use | Model is outside linearity, material or geometry assumptions | Adapter validity envelope, diagnostics and stop conditions |
+| Mesh/convergence error | Attractive but numerically unstable result | Quality metrics, refinement/convergence tests and reference cases |
+| Stress singularities | Infinite/local peaks drive false rejection or optimization | Domain-defined evaluation regions and singularity diagnostics |
+| CAD semantic drift | Parameter/feature IDs or protected faces change | Revision checks, named datums/interfaces and re-onboarding |
+| Partial write | CAD changes but verification/versioning fails | Isolated workspace, recovery snapshot/procedure and explicit partial state |
+| Optimizer exploitation | Candidate exploits model weakness rather than design intent | Hard bounds, plausibility checks, multi-fidelity verification and OOD detection |
+| Hallucinated engineering rule | LLM creates a requirement or allowable | Typed requirement approval and source provenance |
+| Knowledge conflict/staleness | Wrong standard revision or jurisdiction is applied | Version/applicability metadata and human conflict resolution |
+| Prompt injection | Imported CAD/docs attempt to control tools | Treat content as data, isolate retrieval and allowlist actions |
+| Confidentiality/IP leakage | Customer CAD or licensed standards enter logs/training | Tenant isolation, redaction, retention and explicit training consent |
+| Non-reproducible evidence | Solver/environment changes alter results | Capture versions, inputs, artifacts, seeds and execution environment |
+| Latency/cost | FEA/CFD and CAD calls make iteration unusable | Cheap prechecks, caches, asynchronous jobs, budgets and replay |
+| Demo overfitting | Second hand-built example hides core coupling | Independent onboarding test and cross-domain core-code assertions |
+| Liability/certification confusion | “Verified” is read as certified safe | Evidence-level labels, limitations and mandatory professional review |
+
+### 11. Required evaluations
+
+- Manifest schema/versioning, immutability and migration tests.
+- Cross-domain run-loop tests proving no fin field or metric is assumed.
+- CAD inventory/probe tests for units, bounds, aliases, dependencies, stale
+  revisions, unsupported features, wrong part and wrong scale.
+- Geometry tests for parseability, nonmanifold meshes, envelopes, clearances and
+  protected-interface changes.
+- Adapter contract tests for required inputs/metrics, unit dimensions,
+  determinism, validity range, timeout, resource failure and non-convergence.
+- Per-adapter golden analytical/benchmark cases, sensitivity direction and
+  solver-version regression tests.
+- Agent evals for requirement extraction, mandatory questions, source citation,
+  safe refusal, adapter selection and failure diagnosis.
+- Security evals for prompt-injected metadata/documents, malicious artifacts,
+  secrets/redaction and authorization boundaries.
+- End-to-end disposable-project tests covering inspect → approved manifest →
+  simulate → optimize → evidence → approval → write/read-back/version.
+
+### 12. Open decisions before implementation beyond Phase 1
+
+- Exact second object: drone arm versus simpler bracket.
+- Structural solver/mesher after a validation and installation spike.
+- How protected interfaces are authored: CAD-native names, mate connectors,
+  datum geometry, supplemental selections or a combination.
+- Required recovery guarantee after a successful CAD POST and failed downstream
+  verification.
+- Storage, retention, encryption and model-provider policy for customer CAD and
+  engineering documents.
+- Initial standards/material corpus, licensing and ownership of updates.
+- Default autonomy level for low-risk read-only work versus modification.
+- Whether deployment remains local-first or introduces managed solver workers.
+
+---
+
+## Historical checkpoint — engineering-change handoff (Sat Oct 24)
+
+This section records the completed Oct 24 implementation checkpoint and is
+superseded by Roadmap v2 above. At that checkpoint, the fin remained the single
+judged object; a drone arm, structural FEA, arbitrary feature generation and a
+second scorer were deferred.
 
 **Working branch:** `codex/onshape-change-workflow`
 
@@ -118,6 +508,12 @@ Add a structural `SolverAdapter` on a controlled second part only after the fin
 workflow is complete. The second part must have a defensible load case, material
 model, mesh-convergence check, manufacturing rules, and an evidence schema. It
 is the proof of multi-domain architecture, not part of the current submission.
+
+## Archived original hackathon plan
+
+The remainder of this document is the original fin-focused build plan. It is
+retained for decisions, contracts and historical rationale, but it is not the
+current implementation order. Roadmap v2 above is authoritative.
 
 > **Read me first.** This file is the single source of truth for four people and four Claude Code agents working in parallel.
 > - **Part B is the contract.** After checkpoint CP0 (Fri 20:30), `shared/` is **frozen**. No agent edits `shared/` or another section's folder. If a contract looks wrong, write the request in your own section's `CONTRACT_REQUESTS.md`, and the contract owner (S3) decides.
