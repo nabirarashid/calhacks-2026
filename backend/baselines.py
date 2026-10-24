@@ -81,3 +81,19 @@ def run_cmaes(space: DesignSpace, goal: Goal, evaluate: Callable, budget: int, s
 
 
 RUNNERS = {"cmaes": run_cmaes, "random": run_random}
+
+
+def editable_view(space: DesignSpace, goal: Goal, start: Dict[str, ParamValue], evaluate: Callable):
+    """Restrict a baseline to the params the user allowed to change (PLAN.md B.4: baselines never touch
+    the rest). Returns (sub_space, sub_evaluate, sub_default); sub_evaluate merges the held values back."""
+    names = [p.name for p in space.parameters]
+    editable = [n for n in (goal.editable or names) if n in names and n not in goal.fixed_params]
+    held = {n: v for n, v in canonicalize(space, dict(start, **goal.fixed_params)).items() if n not in editable}
+    sub = space.model_copy(update={"parameters": [p for p in space.parameters if p.name in editable]})
+    sub_goal = goal.model_copy(update={"fixed_params": {}, "editable": None})
+
+    def sub_evaluate(_space: DesignSpace, params: Dict[str, ParamValue], _goal: Goal):
+        return evaluate(space, dict(held, **params), goal)
+
+    default = {n: v for n, v in canonicalize(space, dict(start)).items() if n in editable}
+    return sub, sub_evaluate, default, sub_goal

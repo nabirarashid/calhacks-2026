@@ -163,3 +163,23 @@ def test_claim_check_accepts_magnitudes():
     from backend.agents.base import unverified_numbers
     assert unverified_numbers("stall margin fell 22.3%", {"pct": -22.338}) == []
     assert unverified_numbers("it fell 41.0%", {"pct": -22.338}) == ["41.0"]
+
+
+def test_baselines_search_only_editable_params():
+    from backend.baselines import RUNNERS, editable_view
+    from backend.wiring import Wiring
+    w = Wiring()
+    space = w.resolve("rear_wing")
+    goal = WING_GOAL.model_copy(update={"editable": ["aoa_deg", "flap_angle_deg"]})
+    start = {p.name: p.default for p in space.parameters}
+    seen = []
+
+    def evaluate(sp, params, g):
+        seen.append(dict(params))
+        return w.sim.evaluate(sp, params, g)
+
+    sub, sub_eval, default, sub_goal = editable_view(space, goal, start, evaluate)
+    assert [p.name for p in sub.parameters] == ["aoa_deg", "flap_angle_deg"]
+    for method in ("cmaes", "random"):
+        RUNNERS[method](sub, sub_goal, sub_eval, 8, 1, "t", 4, default)
+    assert seen and all(p["span_mm"] == start["span_mm"] and p["chord_mm"] == start["chord_mm"] for p in seen)
