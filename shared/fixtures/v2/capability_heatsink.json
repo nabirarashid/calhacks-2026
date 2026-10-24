@@ -1,0 +1,28 @@
+{
+  "project_id": "heatsink",
+  "maturity": 1,
+  "found": {
+    "config_inputs": 5,
+    "parts": 1,
+    "features": 3,
+    "mate_connectors": 0,
+    "export_formats": [
+      "stl",
+      "step"
+    ]
+  },
+  "missing": [
+    {
+      "id": "power",
+      "field": "load_cases[0]",
+      "prompt": "How much heat (W) does the device dissipate, at what ambient?",
+      "why": "A thermal adapter needs the heat load; Darwin never assumes one.",
+      "required_for": 3,
+      "options": null
+    }
+  ],
+  "unsupported": [
+    "No thermal SolverAdapter installed."
+  ],
+  "required_adapter": "thermal_*"
+}

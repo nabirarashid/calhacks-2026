@@ -260,6 +260,10 @@ export function reduceEvent(state: RunFoldState, event: AnyDarwinEvent): RunFold
     case 'error':
       return { ...next, errors: [...next.errors, event.payload] };
 
+    case 'analysis_progress':
+      // contracts v1.1: FEA stage progress. W-D renders it in P3-D1; until then it is ignored.
+      return next;
+
     default: {
       const exhaustive: never = event;
       return exhaustive;

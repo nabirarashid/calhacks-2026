@@ -1,8 +1,9 @@
 """Fixture-backed Darwin API on :8000 (PLAN.md B.8 / B.10). Run: python -m shared.mocks.mock_server
 
-Implements every REST route in B.8. POST /api/runs and POST /api/replay stream
+Implements every REST route in B.8, plus the contracts-v2 project routes (PLAN.md v3 B.7)
+backed by shared.mocks.fake_onboarding. POST /api/runs and POST /api/replay stream
 fixtures/sample_run.jsonl over /ws at its recorded timing (x speed), with run_id
-rewritten. The goal you submit is shown in the summaries; the designs are
+rewritten; a run for a bracket project streams fixtures/v2/sample_structural_run.jsonl. The goal you submit is shown in the summaries; the designs are
 always the recorded ones. Geometry comes from fixtures/geometry/. Env:
 PORT (8000), MOCK_SPEED (1.0).
 """
@@ -19,7 +20,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 
 from shared.contracts import CONTRACT_VERSION, DesignSpace, Goal, MetricInfo
-from shared.mocks import fake_cad, fake_llm
+from shared.manifest import InspectRequest, ManifestUpdate
+from shared.mocks import fake_cad, fake_llm, fake_onboarding
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 SAMPLE = FIXTURES / "sample_run.jsonl"
@@ -29,6 +31,8 @@ SPACE = DesignSpace.model_validate_json((FIXTURES / "design_space_fin.json").rea
 CATALOG = json.loads((FIXTURES / "metric_catalog_fin.json").read_text())
 PRESETS = json.loads((FIXTURES / "presets.json").read_text())
 GOAL_EXAMPLE = json.loads((FIXTURES / "goal_example.json").read_text())
+STRUCTURAL = [json.loads(line) for line in (FIXTURES / "v2" / "sample_structural_run.jsonl").read_text().splitlines()
+              if line.strip()]
 
 
 class Run:
@@ -54,7 +58,7 @@ WILDCARD = set()  # type: Set[asyncio.Queue]
 
 
 def _remap(ev: Dict[str, Any], run_id: str, goal: Optional[Dict[str, Any]], ts: float) -> Dict[str, Any]:
-    out = json.loads(json.dumps(ev).replace(TEMPLATE_RUN_ID, run_id))
+    out = json.loads(json.dumps(ev).replace(ev["run_id"], run_id))
     out["ts"] = round(ts, 3)
     summary = out["payload"].get("summary")
     if goal is not None and isinstance(summary, dict):
@@ -68,11 +72,11 @@ async def _publish(run: Run, ev: Dict[str, Any]) -> None:
         q.put_nowait(ev)
 
 
-async def _stream(run: Run, goal: Optional[Dict[str, Any]], speed: float) -> None:
+async def _stream(run: Run, goal: Optional[Dict[str, Any]], speed: float, template: List[Dict[str, Any]]) -> None:
     t_start = time.time()
-    t0 = TEMPLATE[0]["ts"]
+    t0 = template[0]["ts"]
     try:
-        for ev in TEMPLATE:
+        for ev in template:
             delay = (ev["ts"] - t0) / max(speed, 0.01) - (time.time() - t_start)
             if delay > 0:
                 await asyncio.sleep(delay)
@@ -83,19 +87,21 @@ async def _stream(run: Run, goal: Optional[Dict[str, Any]], speed: float) -> Non
         raise
 
 
-def _start(prefix: str, goal: Optional[Dict[str, Any]], speed: float) -> Run:
+def _start(prefix: str, goal: Optional[Dict[str, Any]], speed: float,
+           template: Optional[List[Dict[str, Any]]] = None) -> Run:
     run_id = "%s_%s_%s" % (prefix, time.strftime("%H%M"), uuid.uuid4().hex[:4])
     run = Run(run_id)
     RUNS[run_id] = run
-    run.task = asyncio.get_event_loop().create_task(_stream(run, goal, speed))
+    run.task = asyncio.get_event_loop().create_task(_stream(run, goal, speed, template or TEMPLATE))
     return run
 
 
 def _preload_sample() -> None:
-    run = Run(TEMPLATE_RUN_ID)
-    run.events = list(TEMPLATE)
-    run.status = "complete"
-    RUNS[TEMPLATE_RUN_ID] = run
+    for template in (STRUCTURAL, TEMPLATE):    # the fin sample stays first in GET /api/runs
+        run = Run(template[0]["run_id"])
+        run.events = list(template)
+        run.status = "complete"
+        RUNS[run.run_id] = run
 
 
 def _find_design(run_id: str, design_id: str) -> Dict[str, Any]:
@@ -161,7 +167,9 @@ async def start_run(body: Dict[str, Any], speed: Optional[float] = None) -> Dict
     goal = body.get("goal")
     if goal is not None:
         goal = Goal.model_validate(goal).model_dump(mode="json")
-    run = _start("run", goal, speed or float(os.environ.get("MOCK_SPEED", "1.0")))
+    project = str(body.get("project_id") or body.get("design_space_id") or "")
+    template = STRUCTURAL if project.startswith("bracket") else TEMPLATE
+    run = _start("run", goal, speed or float(os.environ.get("MOCK_SPEED", "1.0")), template)
     return {"run_id": run.run_id}
 
 
@@ -247,10 +255,67 @@ def budget() -> Dict[str, Any]:
     return json.loads((FIXTURES / "budget_example.json").read_text())
 
 
+# ---------------------------------------------------------------- contracts v2: projects (PLAN.md v3 B.7)
+
+def _project(project_id: str):
+    m = fake_onboarding.get(project_id)
+    if m is None:
+        raise HTTPException(404, "unknown project")
+    return m
+
+
+@app.get("/api/projects")
+def projects() -> List[Dict[str, Any]]:
+    return [p.model_dump(mode="json") for p in fake_onboarding.summaries()]
+
+
+@app.post("/api/projects/inspect")
+def inspect(body: InspectRequest) -> Dict[str, Any]:
+    return fake_onboarding.inspect(body.doc_url).model_dump(mode="json")
+
+
 @app.post("/api/discover")
 def discover(body: Dict[str, Any]) -> Dict[str, Any]:
-    return fake_cad.discover_design_space(str(body.get("doc_url", "")),
-                                          probe=bool(body.get("probe"))).model_dump(mode="json")
+    """Alias for /api/projects/inspect (v2). The v1 DesignSpace body is retired."""
+    return fake_onboarding.inspect(str(body.get("doc_url", ""))).model_dump(mode="json")
+
+
+@app.get("/api/projects/{project_id}/manifest")
+def get_manifest(project_id: str) -> Dict[str, Any]:
+    return _project(project_id).model_dump(mode="json")
+
+
+@app.post("/api/projects/{project_id}/manifest")
+def update_manifest(project_id: str, body: ManifestUpdate) -> Dict[str, Any]:
+    _project(project_id)
+    try:
+        return fake_onboarding.update(project_id, body).model_dump(mode="json")
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.post("/api/projects/{project_id}/probe")
+def probe(project_id: str) -> List[Dict[str, Any]]:
+    m = _project(project_id)
+    cases = [{p.name: p.default for p in m.design_space.parameters}]
+    for p in m.design_space.parameters:
+        if p.kind != "choice" and p.min is not None and p.max is not None and len(cases) < 9:
+            cases += [{p.name: p.min}, {p.name: p.max}]
+    return [r.model_dump(mode="json") for r in fake_cad.probe(m, cases[:9])]
+
+
+@app.post("/api/projects/{project_id}/activate")
+def activate(project_id: str) -> Dict[str, Any]:
+    _project(project_id)
+    return fake_onboarding.activate(project_id).model_dump(mode="json")
+
+
+@app.get("/api/runs/{run_id}/commit/preview")
+def commit_preview(run_id: str, design_id: str) -> Dict[str, Any]:
+    d = _find_design(run_id, design_id)
+    project = "bracket" if d["design_id"].startswith("run_fixture_bracket") or "flange_length" in d["params"] \
+        else "fin_reference"
+    return fake_cad.preview_commit(_project(project), d["params"]).model_dump(mode="json")
 
 
 @app.websocket("/ws")

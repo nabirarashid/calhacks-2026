@@ -1,0 +1,159 @@
+{
+  "provider": "onshape",
+  "source_microversion": "fixture-bracket-mv1",
+  "document_name": "Darwin bracket",
+  "units": {
+    "length": "mm",
+    "angle": "deg"
+  },
+  "parts": [
+    {
+      "part_id": "JHD",
+      "name": "Bracket",
+      "volume_mm3": 19800.0,
+      "mass_g": 24.6,
+      "bbox_mm": [
+        0.0,
+        0.0,
+        0.0,
+        80.0,
+        40.0,
+        30.0
+      ]
+    }
+  ],
+  "config_inputs": [
+    {
+      "id": "thickness",
+      "name": "thickness",
+      "kind": "quantity",
+      "unit": "mm",
+      "min": 2.0,
+      "max": 8.0,
+      "default": 5.0,
+      "choices": null
+    },
+    {
+      "id": "flange_length",
+      "name": "flange_length",
+      "kind": "quantity",
+      "unit": "mm",
+      "min": 40.0,
+      "max": 120.0,
+      "default": 80.0,
+      "choices": null
+    },
+    {
+      "id": "rib_height",
+      "name": "rib_height",
+      "kind": "quantity",
+      "unit": "mm",
+      "min": 0.0,
+      "max": 20.0,
+      "default": 8.0,
+      "choices": null
+    },
+    {
+      "id": "rib_thickness",
+      "name": "rib_thickness",
+      "kind": "quantity",
+      "unit": "mm",
+      "min": 1.5,
+      "max": 6.0,
+      "default": 3.0,
+      "choices": null
+    },
+    {
+      "id": "fillet_radius",
+      "name": "fillet_radius",
+      "kind": "quantity",
+      "unit": "mm",
+      "min": 1.0,
+      "max": 8.0,
+      "default": 3.0,
+      "choices": null
+    },
+    {
+      "id": "lightening_holes",
+      "name": "lightening_holes",
+      "kind": "quantity",
+      "unit": "",
+      "min": 0.0,
+      "max": 3.0,
+      "default": 0,
+      "choices": null
+    }
+  ],
+  "features": [
+    {
+      "id": "F1",
+      "name": "Upright sketch",
+      "type": "sketch",
+      "suppressed": false
+    },
+    {
+      "id": "F2",
+      "name": "Upright",
+      "type": "extrude",
+      "suppressed": false
+    },
+    {
+      "id": "F3",
+      "name": "Flange",
+      "type": "extrude",
+      "suppressed": false
+    },
+    {
+      "id": "F4",
+      "name": "Rib",
+      "type": "extrude",
+      "suppressed": false
+    },
+    {
+      "id": "F5",
+      "name": "Corner fillet",
+      "type": "fillet",
+      "suppressed": false
+    },
+    {
+      "id": "F6",
+      "name": "Lightening holes",
+      "type": "linearPattern",
+      "suppressed": false
+    }
+  ],
+  "mate_connectors": [
+    {
+      "id": "M1",
+      "name": "mount_hole_a",
+      "origin_mm": [
+        0.0,
+        25.0,
+        8.0
+      ]
+    },
+    {
+      "id": "M2",
+      "name": "mount_hole_b",
+      "origin_mm": [
+        0.0,
+        25.0,
+        22.0
+      ]
+    },
+    {
+      "id": "M3",
+      "name": "load_hole",
+      "origin_mm": [
+        75.0,
+        0.0,
+        15.0
+      ]
+    }
+  ],
+  "export_formats": [
+    "stl",
+    "step"
+  ],
+  "onshape_calls": 6
+}

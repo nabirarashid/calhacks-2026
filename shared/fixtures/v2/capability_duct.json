@@ -1,0 +1,19 @@
+{
+  "project_id": "duct",
+  "maturity": 1,
+  "found": {
+    "config_inputs": 5,
+    "parts": 1,
+    "features": 3,
+    "mate_connectors": 0,
+    "export_formats": [
+      "stl",
+      "step"
+    ]
+  },
+  "missing": [],
+  "unsupported": [
+    "Requires a CFD SolverAdapter (internal flow); not attempted by design."
+  ],
+  "required_adapter": "cfd_*"
+}

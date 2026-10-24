@@ -1,0 +1,301 @@
+{
+  "schema_version": "manifest-v1",
+  "project_id": "fin_reference",
+  "revision": 1,
+  "name": "Rocket fin (reference project)",
+  "domain_pack": "rocket_fin",
+  "cad": {
+    "provider": "onshape",
+    "doc_ref": "DARWIN_DOC_FIN",
+    "write_target_ref": "DARWIN_ONSHAPE_WRITE_TARGET_URL",
+    "source_microversion": null,
+    "export": "stl_configured"
+  },
+  "design_space": {
+    "id": "fin_v1",
+    "name": "Trapezoidal rocket fin",
+    "scorer": "fin_v1",
+    "parameters": [
+      {
+        "name": "root_chord",
+        "kind": "continuous",
+        "unit": "mm",
+        "min": 50.0,
+        "max": 130.0,
+        "step": 0.5,
+        "choices": null,
+        "default": 90.0,
+        "cad_driven": true,
+        "cad_ref": "root_chord",
+        "description": "Chord at the body tube"
+      },
+      {
+        "name": "taper_ratio",
+        "kind": "continuous",
+        "unit": "",
+        "min": 0.2,
+        "max": 1.0,
+        "step": 0.01,
+        "choices": null,
+        "default": 0.5,
+        "cad_driven": true,
+        "cad_ref": "taper_ratio",
+        "description": "Tip chord / root chord"
+      },
+      {
+        "name": "semi_span",
+        "kind": "continuous",
+        "unit": "mm",
+        "min": 30.0,
+        "max": 90.0,
+        "step": 0.5,
+        "choices": null,
+        "default": 60.0,
+        "cad_driven": true,
+        "cad_ref": "semi_span",
+        "description": "Fin height from the body tube"
+      },
+      {
+        "name": "sweep_deg",
+        "kind": "continuous",
+        "unit": "deg",
+        "min": 0.0,
+        "max": 60.0,
+        "step": 0.5,
+        "choices": null,
+        "default": 30.0,
+        "cad_driven": true,
+        "cad_ref": "sweep_deg",
+        "description": "Leading-edge sweep angle"
+      },
+      {
+        "name": "thickness",
+        "kind": "continuous",
+        "unit": "mm",
+        "min": 2.0,
+        "max": 5.0,
+        "step": 0.1,
+        "choices": null,
+        "default": 3.0,
+        "cad_driven": true,
+        "cad_ref": "thickness",
+        "description": "Plate thickness"
+      },
+      {
+        "name": "edge_profile",
+        "kind": "choice",
+        "unit": "",
+        "min": null,
+        "max": null,
+        "step": null,
+        "choices": [
+          "square"
+        ],
+        "default": "square",
+        "cad_driven": false,
+        "cad_ref": "edge_profile",
+        "description": "Leading/trailing edge treatment"
+      },
+      {
+        "name": "fin_count",
+        "kind": "integer",
+        "unit": "",
+        "min": 3.0,
+        "max": 4.0,
+        "step": 1.0,
+        "choices": null,
+        "default": 4,
+        "cad_driven": false,
+        "cad_ref": null,
+        "description": "Fins on the rocket (sim-only)"
+      }
+    ],
+    "context": {
+      "body_diameter_mm": 76.2,
+      "body_length_mm": 1200.0,
+      "nose_length_mm": 300.0,
+      "nose_shape": "ogive",
+      "mass_without_fins_g": 1500.0,
+      "cg_without_fins_mm": 700.0,
+      "design_velocity_mps": 120.0,
+      "altitude_m": 0.0,
+      "alpha_deg": 2.0,
+      "material": "PLA",
+      "density_g_cm3": 1.24,
+      "shear_modulus_gpa": 1.3
+    },
+    "source": {
+      "kind": "onshape",
+      "doc_url": null,
+      "mode": "configuration",
+      "model_revision": "r1"
+    },
+    "discovered": false,
+    "notes": []
+  },
+  "semantics": [
+    {
+      "name": "root_chord",
+      "cad_ref": "root_chord",
+      "role": "editable",
+      "meaning": "Chord at the body tube",
+      "confidence": null,
+      "confirmed": true
+    },
+    {
+      "name": "taper_ratio",
+      "cad_ref": "taper_ratio",
+      "role": "editable",
+      "meaning": "Tip chord / root chord",
+      "confidence": null,
+      "confirmed": true
+    },
+    {
+      "name": "semi_span",
+      "cad_ref": "semi_span",
+      "role": "editable",
+      "meaning": "Fin height from the body tube",
+      "confidence": null,
+      "confirmed": true
+    },
+    {
+      "name": "sweep_deg",
+      "cad_ref": "sweep_deg",
+      "role": "editable",
+      "meaning": "Leading-edge sweep angle",
+      "confidence": null,
+      "confirmed": true
+    },
+    {
+      "name": "thickness",
+      "cad_ref": "thickness",
+      "role": "editable",
+      "meaning": "Plate thickness",
+      "confidence": null,
+      "confirmed": true
+    },
+    {
+      "name": "edge_profile",
+      "cad_ref": "edge_profile",
+      "role": "fixed",
+      "meaning": "Leading/trailing edge treatment",
+      "confidence": null,
+      "confirmed": true
+    },
+    {
+      "name": "fin_count",
+      "cad_ref": "fin_count",
+      "role": "editable",
+      "meaning": "Fins on the rocket (sim-only)",
+      "confidence": null,
+      "confirmed": true
+    }
+  ],
+  "protected": [],
+  "material": {
+    "name": "PLA (solid)",
+    "density_kg_m3": 1240.0,
+    "youngs_mpa": 3500.0,
+    "poisson": 0.36,
+    "yield_mpa": 50.0,
+    "source": {
+      "kind": "project_doc",
+      "source_id": "sim/PHYSICS.md",
+      "title": "Darwin fin physics",
+      "version": "",
+      "section": "Assumptions"
+    },
+    "confirmed": true
+  },
+  "load_cases": [
+    {
+      "id": "reference_flight",
+      "kind": "aero_reference",
+      "applied_at": null,
+      "vector_n": null,
+      "fixtures": [],
+      "source": {
+        "kind": "project_doc",
+        "source_id": "sim/PHYSICS.md",
+        "title": "Darwin fin physics",
+        "version": "",
+        "section": "Assumptions"
+      },
+      "confirmed": true
+    }
+  ],
+  "requirements": [
+    {
+      "id": "flutter",
+      "constraint": {
+        "ref": "flutter_margin",
+        "op": ">=",
+        "value": 1.5,
+        "hard": true,
+        "label": "Flutter margin >= 1.5"
+      },
+      "evaluator": "metric_compare",
+      "source": {
+        "kind": "project_doc",
+        "source_id": "sim/PHYSICS.md",
+        "title": "Darwin fin physics",
+        "version": "",
+        "section": "Assumptions"
+      },
+      "approved": true
+    },
+    {
+      "id": "stable",
+      "constraint": {
+        "ref": "stability_margin_cal",
+        "op": ">=",
+        "value": 1.0,
+        "hard": true,
+        "label": "Stability >= 1.0 cal"
+      },
+      "evaluator": "metric_compare",
+      "source": {
+        "kind": "project_doc",
+        "source_id": "sim/PHYSICS.md",
+        "title": "Darwin fin physics",
+        "version": "",
+        "section": "Assumptions"
+      },
+      "approved": true
+    }
+  ],
+  "analysis": {
+    "screening_adapter": "fin_v1",
+    "verify_adapter": "fin_v1",
+    "verify_top_k": 0,
+    "convergence": "none",
+    "timeout_s": 60.0
+  },
+  "authority": {
+    "maturity": 3,
+    "permitted": [
+      "inspect",
+      "probe",
+      "simulate",
+      "optimize"
+    ],
+    "max_onshape_calls_per_run": 12,
+    "evidence": [
+      "golden:sim/tests/test_physics.py",
+      "probe:CP1 configured export OK x5"
+    ]
+  },
+  "assumptions": [
+    "Subsonic, low incidence, fixed reference rocket (sim/PHYSICS.md).",
+    "Yield strength is not used by fin_v1; listed for completeness."
+  ],
+  "open_questions": [],
+  "history": [
+    {
+      "revision": 1,
+      "at": "2026-10-24T12:00:00-07:00",
+      "by": "W-C",
+      "change": "Fin reference project created from contracts-v1 design_space_fin.json"
+    }
+  ]
+}

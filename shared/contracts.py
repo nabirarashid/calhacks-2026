@@ -11,7 +11,7 @@ from typing import Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
-CONTRACT_VERSION = "1.0.0"
+CONTRACT_VERSION = "1.1.0"   # 1.1.0 (contracts-v2): AnalysisArtifact, DesignResult.analysis; see shared/manifest.py
 
 ParamValue = Union[float, int, str]
 
@@ -137,6 +137,23 @@ class GeometryRef(BaseModel):
     elapsed_ms: float = 0.0
 
 
+# ---------------------------------------------------------------- solver evidence (v1.1)
+
+class AnalysisArtifact(BaseModel):              # one solver run on one design (PLAN.md v3 B.3)
+    design_id: str
+    adapter_id: str                            # "fin_v1" | "structural_analytic_v1" | "structural_fea_v1"
+    adapter_version: str
+    fidelity: Literal["screening", "verification"]
+    metrics: Dict[str, float]
+    converged: Optional[bool] = None           # None = no convergence check was run
+    mesh: Dict[str, float] = Field(default_factory=dict)        # nodes, elements, h_mm, level
+    validity: List[str] = Field(default_factory=list)           # envelope notes / violations
+    diagnostics: Dict[str, float] = Field(default_factory=dict)
+    solver_version: str = ""
+    artifact_paths: List[str] = Field(default_factory=list)     # under .darwin/, never served raw
+    elapsed_ms: float = 0.0
+
+
 # ---------------------------------------------------------------- designs & runs
 
 Origin = Literal["seed", "agent", "fallback", "baseline_cmaes", "baseline_random"]
@@ -164,6 +181,7 @@ class DesignResult(BaseModel):
     pareto_rank: Optional[int] = None          # 0 = on the front (agent designs only)
     geometry: Optional[GeometryRef] = None
     timings_ms: Dict[str, float] = Field(default_factory=dict)  # propose, eval, geometry
+    analysis: Optional[AnalysisArtifact] = None                 # v1.1: verification evidence, if any
 
 
 ORIGIN_CODE = {"seed": "s", "agent": "a", "fallback": "f", "baseline_cmaes": "c", "baseline_random": "r"}

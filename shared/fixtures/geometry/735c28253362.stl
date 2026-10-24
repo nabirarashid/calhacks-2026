@@ -1,0 +1,254 @@
+solid bracket
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 0.000 0.000
+      vertex 58.000 4.300 0.000
+      vertex 58.000 0.000 0.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 0.000 0.000
+      vertex 0.000 4.300 0.000
+      vertex 58.000 4.300 0.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 0.000 30.000
+      vertex 58.000 0.000 30.000
+      vertex 58.000 4.300 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 0.000 30.000
+      vertex 58.000 4.300 30.000
+      vertex 0.000 4.300 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 0.000 0.000
+      vertex 58.000 0.000 0.000
+      vertex 58.000 0.000 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 0.000 0.000
+      vertex 58.000 0.000 30.000
+      vertex 0.000 0.000 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 58.000 0.000 0.000
+      vertex 58.000 4.300 0.000
+      vertex 58.000 4.300 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 58.000 0.000 0.000
+      vertex 58.000 4.300 30.000
+      vertex 58.000 0.000 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 58.000 4.300 0.000
+      vertex 0.000 4.300 0.000
+      vertex 0.000 4.300 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 58.000 4.300 0.000
+      vertex 0.000 4.300 30.000
+      vertex 58.000 4.300 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 4.300 0.000
+      vertex 0.000 0.000 0.000
+      vertex 0.000 0.000 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 4.300 0.000
+      vertex 0.000 0.000 30.000
+      vertex 0.000 4.300 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 0.000 0.000
+      vertex 4.300 40.000 0.000
+      vertex 4.300 0.000 0.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 0.000 0.000
+      vertex 0.000 40.000 0.000
+      vertex 4.300 40.000 0.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 0.000 30.000
+      vertex 4.300 0.000 30.000
+      vertex 4.300 40.000 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 0.000 30.000
+      vertex 4.300 40.000 30.000
+      vertex 0.000 40.000 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 0.000 0.000
+      vertex 4.300 0.000 0.000
+      vertex 4.300 0.000 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 0.000 0.000
+      vertex 4.300 0.000 30.000
+      vertex 0.000 0.000 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 4.300 0.000 0.000
+      vertex 4.300 40.000 0.000
+      vertex 4.300 40.000 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 4.300 0.000 0.000
+      vertex 4.300 40.000 30.000
+      vertex 4.300 0.000 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 4.300 40.000 0.000
+      vertex 0.000 40.000 0.000
+      vertex 0.000 40.000 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 4.300 40.000 0.000
+      vertex 0.000 40.000 30.000
+      vertex 4.300 40.000 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 40.000 0.000
+      vertex 0.000 0.000 0.000
+      vertex 0.000 0.000 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 40.000 0.000
+      vertex 0.000 0.000 30.000
+      vertex 0.000 40.000 30.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 4.300 4.300 13.550
+      vertex 58.000 14.300 13.550
+      vertex 58.000 4.300 13.550
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 4.300 4.300 13.550
+      vertex 4.300 14.300 13.550
+      vertex 58.000 14.300 13.550
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 4.300 4.300 16.450
+      vertex 58.000 4.300 16.450
+      vertex 58.000 14.300 16.450
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 4.300 4.300 16.450
+      vertex 58.000 14.300 16.450
+      vertex 4.300 14.300 16.450
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 4.300 4.300 13.550
+      vertex 58.000 4.300 13.550
+      vertex 58.000 4.300 16.450
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 4.300 4.300 13.550
+      vertex 58.000 4.300 16.450
+      vertex 4.300 4.300 16.450
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 58.000 4.300 13.550
+      vertex 58.000 14.300 13.550
+      vertex 58.000 14.300 16.450
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 58.000 4.300 13.550
+      vertex 58.000 14.300 16.450
+      vertex 58.000 4.300 16.450
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 58.000 14.300 13.550
+      vertex 4.300 14.300 13.550
+      vertex 4.300 14.300 16.450
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 58.000 14.300 13.550
+      vertex 4.300 14.300 16.450
+      vertex 58.000 14.300 16.450
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 4.300 14.300 13.550
+      vertex 4.300 4.300 13.550
+      vertex 4.300 4.300 16.450
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 4.300 14.300 13.550
+      vertex 4.300 4.300 16.450
+      vertex 4.300 14.300 16.450
+    endloop
+  endfacet
+endsolid bracket

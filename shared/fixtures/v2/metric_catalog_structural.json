@@ -1,0 +1,52 @@
+[
+  {
+    "name": "mass_g",
+    "unit": "g",
+    "description": "Bracket mass",
+    "better": "lower",
+    "typical_min": 5.0,
+    "typical_max": 60.0,
+    "default_tolerance": null,
+    "default_target": null
+  },
+  {
+    "name": "tip_deflection_mm",
+    "unit": "mm",
+    "description": "Deflection at the load hole",
+    "better": "lower",
+    "typical_min": 0.0,
+    "typical_max": 5.0,
+    "default_tolerance": null,
+    "default_target": null
+  },
+  {
+    "name": "stress_max_mpa",
+    "unit": "MPa",
+    "description": "Peak bending stress away from holes",
+    "better": "lower",
+    "typical_min": 0.0,
+    "typical_max": 60.0,
+    "default_tolerance": null,
+    "default_target": null
+  },
+  {
+    "name": "stress_hole_mpa",
+    "unit": "MPa",
+    "description": "Peak stress at the protected mounting holes",
+    "better": "lower",
+    "typical_min": 0.0,
+    "typical_max": 80.0,
+    "default_tolerance": null,
+    "default_target": null
+  },
+  {
+    "name": "safety_factor",
+    "unit": "",
+    "description": "Yield / governing stress",
+    "better": "higher",
+    "typical_min": 0.5,
+    "typical_max": 6.0,
+    "default_tolerance": null,
+    "default_target": null
+  }
+]

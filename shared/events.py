@@ -16,7 +16,7 @@ from shared.contracts import (
 
 EventType = Literal["run_started", "design_evaluated", "generation_complete", "champion_updated",
                     "geometry_ready", "agent_message", "baseline_progress", "landscape_ready",
-                    "budget_update", "run_complete", "error"]
+                    "budget_update", "run_complete", "error", "analysis_progress"]
 
 
 class Event(BaseModel):
@@ -82,6 +82,14 @@ class RunComplete(BaseModel):
     summary: RunSummary
 
 
+class AnalysisProgress(BaseModel):             # v1.1: long solver jobs (FEA) report stages
+    design_id: str
+    adapter_id: str
+    stage: Literal["export", "mesh", "solve", "parse", "converge"]
+    pct: float                                 # 0..100 within the whole job
+    elapsed_ms: float = 0.0
+
+
 class ErrorEvent(BaseModel):
     component: Literal["llm", "onshape", "sim", "backend"]
     code: str
@@ -102,6 +110,7 @@ PAYLOADS = {
     "budget_update": BudgetUpdate,
     "run_complete": RunComplete,
     "error": ErrorEvent,
+    "analysis_progress": AnalysisProgress,
 }  # type: Dict[str, Type[BaseModel]]
 
 

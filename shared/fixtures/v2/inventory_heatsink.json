@@ -1,0 +1,102 @@
+{
+  "provider": "onshape",
+  "source_microversion": "fixture-heatsink-mv1",
+  "document_name": "Darwin heat sink",
+  "units": {
+    "length": "mm"
+  },
+  "parts": [
+    {
+      "part_id": "JKD",
+      "name": "Heat sink",
+      "volume_mm3": 31000.0,
+      "mass_g": 83.7,
+      "bbox_mm": [
+        0.0,
+        0.0,
+        0.0,
+        60.0,
+        60.0,
+        30.0
+      ]
+    }
+  ],
+  "config_inputs": [
+    {
+      "id": "base_thickness",
+      "name": "base_thickness",
+      "kind": "quantity",
+      "unit": "mm",
+      "min": 2.0,
+      "max": 8.0,
+      "default": 4,
+      "choices": null
+    },
+    {
+      "id": "fin_count",
+      "name": "fin_count",
+      "kind": "quantity",
+      "unit": "",
+      "min": 4.0,
+      "max": 20.0,
+      "default": 10,
+      "choices": null
+    },
+    {
+      "id": "fin_height",
+      "name": "fin_height",
+      "kind": "quantity",
+      "unit": "mm",
+      "min": 10.0,
+      "max": 40.0,
+      "default": 25,
+      "choices": null
+    },
+    {
+      "id": "fin_thickness",
+      "name": "fin_thickness",
+      "kind": "quantity",
+      "unit": "mm",
+      "min": 0.8,
+      "max": 3.0,
+      "default": 1.5,
+      "choices": null
+    },
+    {
+      "id": "fin_spacing",
+      "name": "fin_spacing",
+      "kind": "quantity",
+      "unit": "mm",
+      "min": 2.0,
+      "max": 10.0,
+      "default": 4.5,
+      "choices": null
+    }
+  ],
+  "features": [
+    {
+      "id": "F1",
+      "name": "Base",
+      "type": "extrude",
+      "suppressed": false
+    },
+    {
+      "id": "F2",
+      "name": "Fin",
+      "type": "extrude",
+      "suppressed": false
+    },
+    {
+      "id": "F3",
+      "name": "Fin pattern",
+      "type": "linearPattern",
+      "suppressed": false
+    }
+  ],
+  "mate_connectors": [],
+  "export_formats": [
+    "stl",
+    "step"
+  ],
+  "onshape_calls": 6
+}

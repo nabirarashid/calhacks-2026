@@ -1,0 +1,211 @@
+{
+  "schema_version": "manifest-v1",
+  "project_id": "bracket",
+  "revision": 1,
+  "name": "Cantilever L-bracket",
+  "domain_pack": "static_structural",
+  "cad": {
+    "provider": "onshape",
+    "doc_ref": "DARWIN_DOC_BRACKET",
+    "write_target_ref": "DARWIN_DOC_BRACKET_WRITE",
+    "source_microversion": null,
+    "export": "step_configured"
+  },
+  "design_space": {
+    "id": "bracket_v1",
+    "name": "Cantilever L-bracket",
+    "scorer": "static_structural",
+    "parameters": [
+      {
+        "name": "thickness",
+        "kind": "continuous",
+        "unit": "mm",
+        "min": 2.0,
+        "max": 8.0,
+        "step": 0.1,
+        "choices": null,
+        "default": 5.0,
+        "cad_driven": true,
+        "cad_ref": "thickness",
+        "description": "Flange plate thickness"
+      },
+      {
+        "name": "flange_length",
+        "kind": "continuous",
+        "unit": "mm",
+        "min": 40.0,
+        "max": 120.0,
+        "step": 0.5,
+        "choices": null,
+        "default": 80.0,
+        "cad_driven": true,
+        "cad_ref": "flange_length",
+        "description": "Wall to load hole"
+      },
+      {
+        "name": "rib_height",
+        "kind": "continuous",
+        "unit": "mm",
+        "min": 0.0,
+        "max": 20.0,
+        "step": 0.5,
+        "choices": null,
+        "default": 8.0,
+        "cad_driven": true,
+        "cad_ref": "rib_height",
+        "description": "Top stiffening rib height (0 = no rib)"
+      },
+      {
+        "name": "rib_thickness",
+        "kind": "continuous",
+        "unit": "mm",
+        "min": 1.5,
+        "max": 6.0,
+        "step": 0.1,
+        "choices": null,
+        "default": 3.0,
+        "cad_driven": true,
+        "cad_ref": "rib_thickness",
+        "description": "Rib wall thickness"
+      },
+      {
+        "name": "fillet_radius",
+        "kind": "continuous",
+        "unit": "mm",
+        "min": 1.0,
+        "max": 8.0,
+        "step": 0.5,
+        "choices": null,
+        "default": 3.0,
+        "cad_driven": true,
+        "cad_ref": "fillet_radius",
+        "description": "Inside corner fillet"
+      },
+      {
+        "name": "lightening_holes",
+        "kind": "integer",
+        "unit": "",
+        "min": 0.0,
+        "max": 3.0,
+        "step": null,
+        "choices": null,
+        "default": 0,
+        "cad_driven": true,
+        "cad_ref": "lightening_holes",
+        "description": "Number of lightening holes in the flange"
+      }
+    ],
+    "context": {
+      "width_mm": 30.0,
+      "upright_mm": 40.0
+    },
+    "source": {
+      "kind": "mock",
+      "doc_url": null,
+      "mode": "configuration",
+      "model_revision": "r1"
+    },
+    "discovered": false,
+    "notes": [
+      "Fixture ranges. W-A owns the real Part Studio ranges; W-B owns the real adapter."
+    ]
+  },
+  "semantics": [
+    {
+      "name": "thickness",
+      "cad_ref": "thickness",
+      "role": "editable",
+      "meaning": "Flange plate thickness",
+      "confidence": 0.8,
+      "confirmed": false
+    },
+    {
+      "name": "flange_length",
+      "cad_ref": "flange_length",
+      "role": "editable",
+      "meaning": "Wall to load hole",
+      "confidence": 0.8,
+      "confirmed": false
+    },
+    {
+      "name": "rib_height",
+      "cad_ref": "rib_height",
+      "role": "editable",
+      "meaning": "Top stiffening rib height (0 = no rib)",
+      "confidence": 0.8,
+      "confirmed": false
+    },
+    {
+      "name": "rib_thickness",
+      "cad_ref": "rib_thickness",
+      "role": "editable",
+      "meaning": "Rib wall thickness",
+      "confidence": 0.8,
+      "confirmed": false
+    },
+    {
+      "name": "fillet_radius",
+      "cad_ref": "fillet_radius",
+      "role": "editable",
+      "meaning": "Inside corner fillet",
+      "confidence": 0.8,
+      "confirmed": false
+    },
+    {
+      "name": "lightening_holes",
+      "cad_ref": "lightening_holes",
+      "role": "editable",
+      "meaning": "Number of lightening holes in the flange",
+      "confidence": 0.8,
+      "confirmed": false
+    }
+  ],
+  "protected": [],
+  "material": null,
+  "load_cases": [],
+  "requirements": [],
+  "analysis": null,
+  "authority": {
+    "maturity": 1,
+    "permitted": [
+      "inspect"
+    ],
+    "max_onshape_calls_per_run": 12,
+    "evidence": []
+  },
+  "assumptions": [],
+  "open_questions": [
+    {
+      "id": "material",
+      "field": "material",
+      "prompt": "Which material, and from which source (datasheet or test)?",
+      "why": "Yield strength and stiffness set every stress and deflection result.",
+      "required_for": 3,
+      "options": null
+    },
+    {
+      "id": "load",
+      "field": "load_cases[0].vector_n",
+      "prompt": "What load acts on the load hole (newtons, direction)?",
+      "why": "Darwin never assumes a load.",
+      "required_for": 3,
+      "options": null
+    },
+    {
+      "id": "fixtures",
+      "field": "load_cases[0].fixtures",
+      "prompt": "Which interfaces are bolted to the wall?",
+      "why": "The boundary condition decides where the bracket bends.",
+      "required_for": 3,
+      "options": null
+    }
+  ],
+  "history": [
+    {
+      "revision": 1,
+      "at": "2026-10-24T19:00:00-07:00",
+      "by": "onboarding",
+      "change": "Draft from inspect"
+    }
+  ]
+}

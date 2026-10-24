@@ -11,11 +11,14 @@ import threading
 import time
 import zipfile
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from shared import fin_geometry
 from shared.contracts import (
     DesignSpace, GeometryRef, OnshapeBudget, ParamValue, canonicalize, geometry_key,
+)
+from shared.manifest import (
+    CadInventory, CheckResult, CommitPreview, GeometryEvidence, ProbeResult, ProjectManifest,
 )
 
 _FIXTURE_GEOMETRY = Path(__file__).resolve().parent.parent / "fixtures" / "geometry"
@@ -123,3 +126,57 @@ def export_print_package(space: DesignSpace, params: Dict[str, ParamValue], out_
             z.write(src, "fin.stl")
         z.writestr("print_card.md", "\n".join(card) + "\n")
     return zpath
+
+
+# ---------------------------------------------------------------- contracts v2 (PLAN.md v3 B.4, B.9)
+
+def inspect(doc_url: str) -> CadInventory:
+    """Read-only inventory from the v2 fixtures, chosen by URL substring (bracket / heat sink / duct)."""
+    from shared.mocks import make_fixtures_v2 as fx
+    u = doc_url.lower()
+    _charge(6)
+    if "duct" in u or "nozzle" in u:
+        return fx.inventory_duct()
+    if "heat" in u or "sink" in u:
+        return fx.inventory_heatsink()
+    return fx.inventory_bracket()
+
+
+def probe(manifest: ProjectManifest, cases: List[Dict[str, ParamValue]]) -> List[ProbeResult]:
+    """Regenerate each case (<= 9). The bracket space gets an L-shaped STL; others the fin plate."""
+    from shared.mocks import make_fixtures_v2 as fx
+    space = manifest.design_space
+    out = []
+    for i, values in enumerate(cases[:9]):
+        p = canonicalize(space, values)
+        key = geometry_key(space, p)
+        if space.id == "bracket_v1":
+            (cache_dir() / ("%s.stl" % key)).write_text(fx.bracket_stl(p))
+            ref = GeometryRef(geometry_key=key, status="ready", source="mock", stl_url="/api/geometry/%s.stl" % key,
+                              onshape_calls=1, regen_status="OK", elapsed_ms=300.0)
+            _charge(1)
+        else:
+            ref = build_geometry(space, p)
+        ok = ref.status == "ready"
+        checks = [CheckResult(id="parse", passed=ok), CheckResult(id="watertight", passed=ok),
+                  CheckResult(id="nonzero_volume", passed=ok)]
+        case = "seed" if i == 0 else "case:%d" % i
+        out.append(ProbeResult(case=case, params=p, geometry=ref, evidence=GeometryEvidence(
+            geometry_key=key, parse_ok=ok, watertight=ok, checks=checks)))
+    return out
+
+
+def preview_commit(manifest: ProjectManifest, params: Dict[str, ParamValue],
+                   current: Optional[Dict[str, ParamValue]] = None) -> CommitPreview:
+    """What a commit would do; no writes, no calls."""
+    space = manifest.design_space
+    new = canonicalize(space, params)
+    old = canonicalize(space, current or {p.name: p.default for p in space.parameters})
+    diff = [{"name": p.name, "from": old[p.name], "to": new[p.name], "unit": p.unit}
+            for p in space.parameters if p.cad_driven and old[p.name] != new[p.name]]
+    blocked = None if manifest.authority.maturity >= 4 else "project is level %d; writes need level 4" \
+        % manifest.authority.maturity
+    return CommitPreview(target=manifest.name + " (isolated write copy)", param_diff=diff, expected_calls=7,
+                         checks_planned=["read back values", "regenerate", "geometry sanity", "protected interfaces",
+                                         "create version"], maturity=manifest.authority.maturity,
+                         blocked_reason=blocked)

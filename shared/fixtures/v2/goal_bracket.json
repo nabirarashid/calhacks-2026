@@ -1,0 +1,41 @@
+{
+  "source_text": "Make the lightest bracket that holds 20 N at the load hole with a safety factor of 2 and no more than 2 mm of deflection.",
+  "objectives": [
+    {
+      "metric": "mass_g",
+      "direction": "minimize",
+      "target": null,
+      "tolerance": null,
+      "weight": 0.7
+    },
+    {
+      "metric": "tip_deflection_mm",
+      "direction": "minimize",
+      "target": null,
+      "tolerance": null,
+      "weight": 0.3
+    }
+  ],
+  "constraints": [
+    {
+      "ref": "safety_factor",
+      "op": ">=",
+      "value": 2.0,
+      "hard": true,
+      "label": "Safety factor >= 2.0"
+    },
+    {
+      "ref": "tip_deflection_mm",
+      "op": "<=",
+      "value": 2.0,
+      "hard": true,
+      "label": "Deflection <= 2 mm"
+    }
+  ],
+  "fixed_params": {},
+  "context_overrides": {},
+  "assumptions": [
+    "20 N downward at the load hole; both mounting holes bolted (engineer-confirmed)."
+  ],
+  "parsed_by": "preset"
+}

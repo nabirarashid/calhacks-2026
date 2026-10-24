@@ -1,6 +1,7 @@
-// Darwin shared contracts — FROZEN mirror of shared/contracts.py + shared/events.py (contracts-v1).
+// Darwin shared contracts — FROZEN mirror of shared/contracts.py + shared/events.py (contracts-v1, v1.1 additions).
+// Contracts v2 project/onboarding types live in shared/manifest.ts.
 // Field names are snake_case exactly as on the wire. Python is the source of truth.
-export const CONTRACT_VERSION = '1.0.0';
+export const CONTRACT_VERSION = '1.1.0';
 
 export type ParamValue = number | string;
 
@@ -113,6 +114,22 @@ export interface GeometryRef {
   elapsed_ms: number;
 }
 
+// ---------------------------------------------------------------- solver evidence (v1.1)
+export interface AnalysisArtifact {
+  design_id: string;
+  adapter_id: string;
+  adapter_version: string;
+  fidelity: 'screening' | 'verification';
+  metrics: Record<string, number>;
+  converged?: boolean | null;
+  mesh: Record<string, number>;
+  validity: string[];
+  diagnostics: Record<string, number>;
+  solver_version: string;
+  artifact_paths: string[];
+  elapsed_ms: number;
+}
+
 // ---------------------------------------------------------------- designs & runs
 export type Origin = 'seed' | 'agent' | 'fallback' | 'baseline_cmaes' | 'baseline_random';
 export type Operator = 'seed' | 'novel' | 'mutate' | 'crossover' | 'refine' | 'repair';
@@ -138,6 +155,7 @@ export interface DesignResult {
   pareto_rank?: number | null;
   geometry?: GeometryRef | null;
   timings_ms: Record<string, number>;
+  analysis?: AnalysisArtifact | null;   // v1.1
 }
 
 export interface Directive {
@@ -255,7 +273,7 @@ export interface RunSummary {
 export type EventType =
   | 'run_started' | 'design_evaluated' | 'generation_complete' | 'champion_updated'
   | 'geometry_ready' | 'agent_message' | 'baseline_progress' | 'landscape_ready'
-  | 'budget_update' | 'run_complete' | 'error';
+  | 'budget_update' | 'run_complete' | 'error' | 'analysis_progress';
 
 export interface RunStartedPayload { summary: RunSummary; design_space: DesignSpace; metric_catalog: MetricInfo[]; }
 export interface DesignEvaluatedPayload { design: DesignResult; }
@@ -285,6 +303,14 @@ export interface ErrorPayload {
   degraded_to?: string | null;
 }
 
+export interface AnalysisProgressPayload {   // v1.1
+  design_id: string;
+  adapter_id: string;
+  stage: 'export' | 'mesh' | 'solve' | 'parse' | 'converge';
+  pct: number;
+  elapsed_ms: number;
+}
+
 export interface PayloadByType {
   run_started: RunStartedPayload;
   design_evaluated: DesignEvaluatedPayload;
@@ -297,6 +323,7 @@ export interface PayloadByType {
   budget_update: BudgetUpdatePayload;
   run_complete: RunCompletePayload;
   error: ErrorPayload;
+  analysis_progress: AnalysisProgressPayload;
 }
 
 export interface DarwinEvent<T extends EventType = EventType> {
