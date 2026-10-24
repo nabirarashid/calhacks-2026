@@ -1,0 +1,86 @@
+solid Mesh
+  facet normal 0 1 0
+    outer loop
+      vertex 70 1.4 0
+      vertex 0 1.4 0
+      vertex 69.9785 1.4 60
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex 0 1.4 0
+      vertex 27.9785 1.4 60
+      vertex 69.9785 1.4 60
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 0 -1.4 0
+      vertex 70 -1.4 0
+      vertex 27.9785 -1.4 60
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 70 -1.4 0
+      vertex 69.9785 -1.4 60
+      vertex 27.9785 -1.4 60
+    endloop
+  endfacet
+  facet normal 1 0 0.000358994
+    outer loop
+      vertex 69.9785 -1.4 60
+      vertex 70 -1.4 0
+      vertex 69.9785 1.4 60
+    endloop
+  endfacet
+  facet normal 1 0 0.000358994
+    outer loop
+      vertex 70 -1.4 0
+      vertex 70 1.4 0
+      vertex 69.9785 1.4 60
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 70 -1.4 0
+      vertex 0 -1.4 0
+      vertex 70 1.4 0
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 -1.4 0
+      vertex 0 1.4 0
+      vertex 70 1.4 0
+    endloop
+  endfacet
+  facet normal -0.906308 0 0.422618
+    outer loop
+      vertex 0 -1.4 0
+      vertex 27.9785 -1.4 60
+      vertex 0 1.4 0
+    endloop
+  endfacet
+  facet normal -0.906308 0 0.422618
+    outer loop
+      vertex 27.9785 -1.4 60
+      vertex 27.9785 1.4 60
+      vertex 0 1.4 0
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 27.9785 -1.4 60
+      vertex 69.9785 -1.4 60
+      vertex 27.9785 1.4 60
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 69.9785 -1.4 60
+      vertex 69.9785 1.4 60
+      vertex 27.9785 1.4 60
+    endloop
+  endfacet
+endsolid Mesh

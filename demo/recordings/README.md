@@ -23,7 +23,30 @@ curl -X POST localhost:8000/api/replay \
 
 `speed` scales the original timing (`8.0` replays a 76-second run in 9.5 s).
 
-## `demo_pitch_goal.jsonl`
+## `demo_pitch_goal_square.jsonl` (current — use this one)
+
+Recorded Sat 12:32 with **real Claude (Haiku 5.5 + one Sonnet report) and real
+Onshape**, after the AeroSandbox race fix, the drag-normalization fix and the
+goal-parser fix. Square edges, exactly what the live Part Studio builds.
+12 Onshape calls, $0.029 of Claude.
+
+Goal: the pitch goal, parsed live by Claude into flutter margin >= 1.5,
+stability >= 1.0 cal, total fin mass <= 40 g, and no aft overhang (the
+3-inch body tube read deterministically as the rocket body).
+
+| | aggregate |
+|---|---|
+| agent champion | **0.582** |
+| CMA-ES, same budget | 0.585 |
+| random search, same budget | −0.006 (infeasible) |
+
+**This run is a tie with CMA-ES. Say so.** The honest claim comes from
+`demo/bench.json` (3 goals × 3 seeds, square edges): the agent beats CMA-ES in
+6 of 9 runs (all 3 on "Min drag", 2 of 3 on this goal, 1 of 3 on "Flutter-safe"),
+and only the agent explains why its winner wins. The seed was not re-rolled to
+get a win.
+
+## `demo_pitch_goal.jsonl` (superseded)
 
 Recorded Fri 23:31 with **real Claude (Haiku 5.5 + one Sonnet report) and real
 Onshape**. 153 events, 76 s, 20 model calls for $0.029, 18 Onshape calls.
