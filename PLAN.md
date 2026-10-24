@@ -358,6 +358,11 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 
 ## Part C: The four sections
 
+**Progress (Sat 15:35):** done: A1, B1, B2, B3, B4, C1, C2. The investigator runs end to end on the
+real rear-wing solver (CP-C's terminal criterion is met). **Not yet visible in git:** anything from
+W-A (A2 wing Part Studio) or W-D (D1 extension). W-C is taking A3 (`cad/variables.py`) after C3,
+with the team's OK.
+
 ### W-A: Onshape (`cad/`, Part Studios, write path)
 
 **Owns:**
@@ -381,7 +386,7 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
   - uprights/mounts: fixed
   - Check every corner of the B.5 ranges regenerates; narrow a range and tell W-B before CP-C
     if one doesn't.
-- [ ] **A3 (by 19:30) `cad/variables.py`** (B.7):
+- [ ] **A3 (by 19:30) `cad/variables.py`** (B.7). *Taken by W-C after C3 (W-A's other items unchanged):*
   - `list_variables`, `apply_values`, `create_version`
   - mocked tests from a sanitized feature-list fixture
   - then live on the wing: write → re-GET → value matches → default STL bbox changes
@@ -417,8 +422,8 @@ The structural/FEA work is parked: leave the files, stop work.
 - NeuralFoil 0.3.2 and AeroSandbox 4.2.8 are installed.
 
 **Checklist:**
-- [ ] **B1 (by 16:00)** Freeze the B.5 names and ranges (edit B.5 here, or tell W-C before 16:00).
-- [ ] **B2 (by 18:00) `sim/plugins/rear_wing_v1.py`** as a ScorerPlugin (`metric_catalog`,
+- [x] **B1 (by 16:00)** ✅ *done 15:15 (W-B, `96fb424`)* Freeze the B.5 names and ranges (edit B.5 here, or tell W-C before 16:00).
+- [x] **B2 (by 18:00) `sim/plugins/rear_wing_v1.py`** ✅ *done 15:20 (W-B, `5441e1b`)* as a ScorerPlugin (`metric_catalog`,
   `metrics`, `evaluate_metrics`, `hifi`), registered as scorer `rear_wing_v1`:
   - main + flap as **one section with a hinged trailing-edge flap** (`asb.ControlSurface`);
     two isolated surfaces stall the flap and were rejected, see B.5
@@ -427,11 +432,11 @@ The structural/FEA work is parked: leave the files, stop work.
   - every B.5 metric
   - `hifi` = VLM
   - under 100 ms per fast evaluation; deterministic; `process_safe`
-- [ ] **B3 (by 19:00) Golden tests:**
+- [x] **B3 (by 19:00) Golden tests:** ✅ *done 15:20 (W-B, `5441e1b`)*
   - induced drag vs `CL²/(π·e·AR)` within 10 %
   - monotonic trends: AoA → downforce up until stall; span → induced drag down; flap → CL up
   - NeuralFoil section CL/CD vs the published XFoil comparison for 4412 at one Re
-- [ ] **B4 (by 20:00) `domains/aero/principles.md`:** 25–35 principles in the B.8 format,
+- [x] **B4 (by 20:00) `domains/aero/principles.md`:** ✅ *done 15:30: 29 principles, each checked against the solver (W-B, `1bf97a2`)* 25–35 principles in the B.8 format,
   covering:
   - induced drag/AR, endplates, the lift-curve slope and stall, Reynolds effects
   - camber vs profile drag, flap angle and chord, the downforce/drag tradeoff, q scaling
@@ -461,12 +466,12 @@ The structural/FEA work is parked: leave the files, stop work.
 - `demo/recordings/`, `demo/bench*.json`
 
 **Checklist:**
-- [ ] **C1 (by 16:00) Contracts v1.2** (B.4):
+- [x] **C1 (by 16:00) Contracts v1.2** ✅ *done 15:02 (W-C, `c1f264e`, tag `contracts-v1.2`)* (B.4):
   - models, events, TS mirror
   - `fake_wing.py`, the sample investigation fixture, mock-server routes (B.10)
   - `projects/rear_wing/r1.json`
   - tag `contracts-v1.2`
-- [ ] **C2 (by 18:00) `backend/investigator.py`** end to end in the terminal on `fake_wing`,
+- [x] **C2 (by 18:00) `backend/investigator.py`** ✅ *done 15:13, live-tested 15:25 on the real solver: +27% downforce inside the drag limit, 16 sims (W-C, `80b9e91`, `22871ef`)* end to end in the terminal on `fake_wing`,
   then on `rear_wing_v1` when W-B lands it:
   - plan / run / score / analyze / decide / learn (B.3)
   - validation of LLM output; rules fallback; stop rules
