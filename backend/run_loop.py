@@ -69,7 +69,9 @@ class RunController:
         self.last_critic_why = None  # type: Optional[str]
         self.geo_q = queue.Queue()  # type: queue.Queue
         self.builds = 0
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
+        self.closed = False
+        self.landscape_future = None  # type: Optional[Future]
         self.summary = RunSummary(run_id=self.run_id, status="running", goal=goal, design_space_id=space.id,
                                   config=config, started_at=_now_iso())
         self.thread = threading.Thread(target=self._main, name="run-%s" % self.run_id, daemon=True)
@@ -83,7 +85,13 @@ class RunController:
         self.stop_flag.set()
 
     def emit(self, type_: str, payload: Any) -> None:
-        self.ch.emit(type_, payload)
+        with self.lock:
+            if self.closed:          # contract: run_complete is the last event of a run
+                log.info("dropping late %s for %s", type_, self.run_id)
+                return
+            if type_ == "run_complete":
+                self.closed = True
+            self.ch.emit(type_, payload)
 
     def message(self, agent: str, kind: str, summary: str, body: str = "", refs: Optional[List[str]] = None,
                 res: Optional[ModelResult] = None, generation: Optional[int] = None,
@@ -143,7 +151,7 @@ class RunController:
         self.base_futures = base_futures = {m: self.pool.submit(RUNNERS[m], space, goal, sim.evaluate, self.budget_evals, cfg.seed,
                                             self.run_id, self.N, default) for m in cfg.baselines}
         if cfg.profile != "bench":
-            self.pool.submit(self._landscape)
+            self.landscape_future = self.pool.submit(self._landscape)
             threading.Thread(target=self._geometry_worker, name="geo-%s" % self.run_id, daemon=True).start()
 
         seed = self._make_design(default, 0, "seed", 0, [], "seed", "Default design from the Part Studio.", {})
@@ -393,7 +401,8 @@ class RunController:
             for extra in ("drag_n", "stability_margin_cal"):
                 if len(metrics) < 2 and extra not in metrics:
                     metrics.append(extra)
-            pts = self.w.sim.landscape(self.space, self.goal, n=2000, seed=self.config.seed)
+            n = 2000 if self.config.profile == "full" else 1200
+            pts = self.w.sim.landscape(self.space, self.goal, n=n, seed=self.config.seed)
             step = max(1, len(pts) // 2000)
             points = [[round(s.metrics[metrics[0]], 4), round(s.metrics[metrics[1]], 4), round(s.aggregate, 4),
                        s.feasible] for _, s in pts[::step]]
@@ -405,7 +414,8 @@ class RunController:
         if not final and self.builds >= self.config.geometry_max_builds:
             return
         self.builds += 1
-        d.geometry = GeometryRef(geometry_key="", status="pending", source="none")
+        from shared.contracts import geometry_key
+        d.geometry = GeometryRef(geometry_key=geometry_key(self.space, d.params), status="pending", source="none")
         self.geo_q.put(d)
 
     def _geometry_worker(self) -> None:
@@ -442,10 +452,10 @@ class RunController:
         if self.baseline_results and (not self.curves.get(cfg.baselines[0]) or
                                       self.curves[cfg.baselines[0]][-1].evals != matched):
             self._baseline_progress(matched)
-        for f in self.critic_futures:
+        for f in self.critic_futures + ([self.landscape_future] if self.landscape_future else []):
             try:
                 f.result(timeout=40)
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 — late or failed advisory work is dropped, never blocks forever
                 pass
         champ = h.champion
         hifi = None
