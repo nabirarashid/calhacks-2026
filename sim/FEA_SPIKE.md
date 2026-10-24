@@ -85,21 +85,95 @@ number that safety rule 3 exists to prevent. `ElementTetP2` fixes it at a
 This is pinned by `test_linear_tets_are_unacceptably_stiff`, which fails if
 anyone reverts the element order. **`structural_fea_v1` must use order 2.**
 
-## G-4 Bracket mesh and solve ≤ 20 s — **pending W-A's P3-A1 export**
+## G-4 Bracket mesh and solve ≤ 20 s — **partly answered, with a hard limit**
 
-Cannot run until a meshable bracket export exists. Projection from the measured
-scaling (3075 dofs → 0.13 s, direct sparse solve ≈ O(n^1.5)):
+The real bracket export is still pending W-A's P3-A1, so the chain was
+exercised end to end on a stand-in STL: a 90 × 60 × 3 mm rectangular plate from
+`shared.fin_geometry.prism_stl` (taper 1, sweep 0), via
+`sim/fea/mesh.py` → `skfem_elastic.solve_mesh_cantilever`.
 
-| bracket dofs | projected solve |
-|---|---|
-| 20 000 | ~2 s |
-| 50 000 | ~9 s |
-| 100 000 | ~24 s — **over budget** |
+**Meshing is not the problem.** `merge → classifySurfaces → createGeometry →
+addVolume → generate(3)` runs in 0.05–0.35 s at every size, and the
+reconstructed volume matches the analytic part to **0.000 %**.
 
-**Guidance for W-A / the mesher: keep the coarse bracket under ~60 000 dofs**
-(roughly 15 000 quadratic tets). Two-level refinement for the champion only, per
-B.10's fidelity ladder. If a coarse mesh exceeds that, drop element size before
-dropping element order — order 1 is not an acceptable trade.
+**Through-wall resolution is the problem.** Reference is *plate* theory, not
+beam theory: the plate is wider (90) than it is long (60), so it bends with
+modulus `E / (1 − ν²)`. Against beam theory a correct answer reads as −8.5 %
+and looks like a failure.
+
+| h | elements through 3 mm | P2 dofs | deflection vs plate theory | solve |
+|---|---|---|---|---|
+| 3.0 | 1.0 | 30 216 | **−83 %** (locked) | 2.3 s |
+| 2.0 | 1.5 | 63 576 | **−85 %** (locked) | 7.2 s |
+| 1.5 | 2.0 | 143 550 | **+2.7 %** | 40 s |
+| 1.2 | 2.5 | 243 933 | +2.9 % | 113 s |
+
+**Two quadratic elements through the wall is the threshold**, not a preference:
+below it the answer is 6× too stiff; at it, refining further moves the result
+0.2 %. So `h = t / 2` is both necessary and sufficient
+(`mesh.h_for_wall`). The cost is what bites: this small plate already needed
+40 s against the 20 s budget.
+
+**Bracket budget** (`mesh.within_dof_budget`, 80k-dof ceiling, default
+geometry ≈ 19 900 mm³):
+
+| thickness | h | est. dofs | FEA |
+|---|---|---|---|
+| 2.0 mm | 1.00 | 595 000 | **decline** |
+| 3.0 mm | 1.50 | 176 000 | **decline** |
+| 4.0 mm | 2.00 | 74 000 | verify |
+| 5.0 mm | 2.50 | 38 000 | verify |
+| ≥ 6 mm | ≥ 3.0 | ≤ 22 000 | verify |
+
+**FEA can verify a bracket at ≥ 4 mm and must decline below.** That is in direct
+tension with the search: a mass-minimising optimizer proposes thin designs,
+which are exactly the ones FEA cannot afford. Below the budget the solve is
+declined and the design keeps its analytic screening label, rather than
+returning a locked (too-stiff) number or blowing the timeout.
+
+### A measured trap: never `mesh.clear()` between levels
+
+On an STL-derived model, `gmsh.model.mesh.clear()` followed by `generate(3)`
+**hangs indefinitely** — no exception, no timeout. Reproduced in isolation: level
+1 meshes in 0.06 s, then the second `generate(3)` never returns. Rebuilding the
+whole pipeline per level costs 0.07 s, so `refinement_levels()` always rebuilds.
+This matters because two-level convergence is required for the champion, and
+the obvious implementation is exactly the one that freezes.
+
+## Demo load case (W-B owns it, P3-B5) — the plan's numbers do not work
+
+Evaluated with `structural_analytic_v1` on the default bracket (rib 8 mm, no
+lightening holes), goal SF ≥ 2:
+
+- **20 N** (the current fixture): **every thickness passes**, including 2 mm. There
+  is no failure to repair, and the optimizer drives to 2 mm, where FEA declines.
+- **50 N** (P3-B5's goal text): **only the 8 mm upper bound passes**. A champion
+  pinned to a bound is exactly what the critic is built to flag as suspicious.
+- **~30 N**: the SF = 2 boundary lands near 4.8 mm, in the interior, inside the
+  FEA budget, with thinner designs genuinely failing. **Recommended starting
+  point** for P3-B5 tuning.
+
+At 30 N the physics also tells a different story from the demo script
+(PLAN.md A.2, 1:30, "fails the stress check at a mounting hole"):
+
+| design | root fillet MPa | hole MPa | mass g | SF | governs |
+|---|---|---|---|---|---|
+| default, t = 5 | 23.63 | 3.54 | 24.70 | 2.12 ✅ | root fillet |
+| thin, t = 4 | 27.86 | 4.42 | 20.24 | 1.79 ❌ | root fillet |
+| t = 5 + 3 lightening holes | 23.63 | 31.48 | 24.34 | 1.59 ❌ | **hole** |
+| t = 5 + 3 holes + rib 16 | 9.66 | 12.59 | 26.72 | 3.97 ✅ | hole |
+
+- **The mounting holes never govern** (3.5–5 MPa): near the wall the bolt couple
+  has a usable arm. Failure happens at the **lightening holes**, in the
+  high-moment flange.
+- **Lightening holes are a bad trade here**: three of them save 0.36 g (1.5 %)
+  while dropping SF from 2.12 to 1.59. That is a non-obvious, explainable
+  result — the kind of finding the critic exists to surface.
+- **A taller rib is the efficient repair**, cutting root stress 23.6 → 9.7 MPa.
+
+So the 1:30 beat should read "fails at a lightening hole", not "at a mounting
+hole". The narrative follows the solver, not the other way round (safety
+rule 1). Final values come from P3-B5's ≥ 4-of-5-seeds tuning.
 
 ## G-5 Verdict
 
@@ -110,9 +184,10 @@ fixtures and load application, with protected-hole stress read separately
 
 Residual risks:
 
-- **G-4 is unproven** until the bracket export lands. If the coarse solve blows
-  the 20 s budget, the fallback is a coarser mesh, then analytic screening only.
-- **STL → volume mesh** may need gmsh `classifySurfaces` + `createGeometry`.
-  Untested here; it is the next W-B task once W-A produces an export.
+- **G-4 on the real bracket** is still unproven; the stand-in plate shows the
+  chain works and where it stops. Thin designs (< 4 mm) are declined by design.
+- **STL → volume mesh** works (`sim/fea/mesh.py`), volume exact. A real CAD
+  export may carry defects a generated prism does not; the volume check against
+  the analytic or CAD volume is the guard for that.
 - Candidate (a) CalculiX is **not validated**. Choosing it later would mean
   writing `.inp` generation and `.frd` parsing from scratch.

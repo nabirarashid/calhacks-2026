@@ -144,3 +144,75 @@ def timoshenko_tip_deflection(length_mm: float, width_mm: float, height_mm: floa
     area = width_mm * height_mm
     kappa = 5.0 / 6.0
     return bending + load_n * length_mm / (kappa * g_mpa * area)
+
+
+# ---- general solve on an imported mesh (the structural_fea_v1 building block) ----
+
+def solve_mesh_cantilever(mesh, e_mpa: float, nu: float,
+                          clamp_select, load_select, force_n,
+                          order: int = 2) -> Dict[str, object]:
+    """Linear-elastic solve on any tet mesh with selector-defined boundaries.
+
+    `clamp_select` and `load_select` are callables taking the (3, n) coordinate
+    array and returning a boolean mask, exactly like skfem's own selectors.
+    `force_n` is the total force vector [fx, fy, fz] in newtons, spread as a
+    uniform traction over the selected facets.
+
+    Order defaults to 2 because quadratic tets are mandatory for bending
+    accuracy (sim/FEA_SPIKE.md).
+    """
+    from skfem import Basis, ElementTetP1, ElementTetP2, ElementVector, FacetBasis
+
+    element = ElementVector(ElementTetP2() if order == 2 else ElementTetP1())
+    basis = Basis(mesh, element)
+    lam, mu = lame_parameters(e_mpa, nu)
+    stiffness = asm(linear_elasticity(lam, mu), basis)
+
+    load_facets = mesh.facets_satisfying(load_select)
+    if load_facets.size == 0:
+        raise ValueError("load_select matched no facets")
+    load_basis = FacetBasis(mesh, element, facets=load_facets)
+    area = float(np.sum(load_basis.dx))
+    if area <= 0.0:
+        raise ValueError("selected load facets have zero area")
+    traction = np.asarray(force_n, dtype=float) / area
+
+    @LinearForm
+    def body(v, w):
+        return traction[0] * v[0] + traction[1] * v[1] + traction[2] * v[2]
+
+    rhs = asm(body, load_basis)
+    clamped = basis.get_dofs(clamp_select)
+    if clamped.all().size == 0:
+        raise ValueError("clamp_select matched no dofs")
+    disp = solve(*condense(stiffness, rhs, D=clamped))
+
+    nodal = disp[basis.nodal_dofs]
+    on_load = load_select(mesh.p)
+    displacement = np.array([float(np.mean(nodal[i][on_load])) for i in range(3)])
+
+    field = basis.interpolate(disp)
+    strain = sym_grad(field)
+    trace_e = strain[0, 0] + strain[1, 1] + strain[2, 2]
+    comps = {}
+    for i in range(3):
+        for j in range(3):
+            s_ij = 2.0 * mu * strain[i, j] + (lam * trace_e if i == j else 0.0)
+            comps[(i, j)] = np.asarray(s_ij)
+    von_mises = np.sqrt(0.5 * (
+        (comps[(0, 0)] - comps[(1, 1)]) ** 2
+        + (comps[(1, 1)] - comps[(2, 2)]) ** 2
+        + (comps[(2, 2)] - comps[(0, 0)]) ** 2
+        + 6.0 * (comps[(0, 1)] ** 2 + comps[(1, 2)] ** 2 + comps[(0, 2)] ** 2)))
+
+    return {
+        "basis": basis,
+        "disp": disp,
+        "displacement_mm": displacement,
+        "deflection_mm": float(np.linalg.norm(displacement)),
+        "stress": comps,
+        "von_mises_mpa": von_mises,
+        "coords_mm": np.asarray(basis.global_coordinates()),
+        "n_dofs": int(basis.N),
+        "load_area_mm2": area,
+    }
