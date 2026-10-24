@@ -69,3 +69,5 @@ PLAN.md Part B.3–B.6 and B.10. Additive: every earlier model, fixture and reco
 
 Mock server: `POST /api/inspect`, `POST /api/sessions` (streams the sample), `GET /api/sessions/{id}/notebook`,
 `POST /api/sessions/{id}/stop`. The finished sample is preloaded as run `session_fixture_wing`.
+| `fixtures/v2/sample_investigation_live.jsonl` | A **real** session: Sonnet 5.5 planning on `fake_wing` (Sat 15:22), 5 steps, +21% downforce at 14.73 N. Use it for real text lengths on the step cards. Its prediction scores predate the in-range scoring fix, so a few small in-range changes show 0 |
+

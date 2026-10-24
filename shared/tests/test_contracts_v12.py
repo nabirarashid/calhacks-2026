@@ -28,6 +28,8 @@ def test_prediction_scoring_is_deterministic():
     assert score_prediction(flat, 1.0).score == 1.0
     down = Prediction(metric="drag_n", direction="down", pct_low=-1, pct_high=-5)   # reversed bounds ok
     assert score_prediction(down, -3.0).in_range
+    small = Prediction(metric="drag_n", direction="up", pct_low=0.5, pct_high=4)    # inside the flat band
+    assert score_prediction(small, 1.9).score == 1.0                                # live run, Sat 15:22
 
 
 def test_goal_editable_is_optional_and_old_goals_still_load():

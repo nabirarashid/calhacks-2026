@@ -72,11 +72,15 @@ class DesignApplied(BaseModel):                 # payload of the design_applied 
 
 
 def score_prediction(p: Prediction, actual_pct: float, flat_band: float = 2.0) -> PredictionCheck:
-    """Deterministic scoring (PLAN.md B.3 step 3). |change| <= flat_band % counts as "flat"."""
-    actual_dir = "flat" if abs(actual_pct) <= flat_band else ("up" if actual_pct > 0 else "down")
+    """Deterministic scoring (PLAN.md B.3 step 3).
+
+    A predicted range that contains the actual change is always right (score 1). Otherwise the
+    direction is judged, with |change| <= flat_band % counting as "flat" (score 0.5 if it matches).
+    """
     lo, hi = min(p.pct_low, p.pct_high), max(p.pct_low, p.pct_high)
-    direction_ok = actual_dir == p.direction
-    in_range = direction_ok and lo - 1e-9 <= actual_pct <= hi + 1e-9
+    in_range = lo - 1e-9 <= actual_pct <= hi + 1e-9
+    actual_dir = "flat" if abs(actual_pct) <= flat_band else ("up" if actual_pct > 0 else "down")
+    direction_ok = in_range or actual_dir == p.direction
     return PredictionCheck(metric=p.metric, predicted=p, actual_pct=round(actual_pct, 3),
                            direction_ok=direction_ok, in_range=in_range,
                            score=1.0 if in_range else (0.5 if direction_ok else 0.0))

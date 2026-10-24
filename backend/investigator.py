@@ -48,6 +48,16 @@ def _pct(before: float, after: float) -> float:
     return 100.0 * (after - before) / abs(before)
 
 
+def _clip(text: str, max_words: int) -> str:
+    """Cap length without cutting mid-sentence: past the cap, end at the last full sentence."""
+    words = text.split()
+    if len(words) <= max_words:
+        return " ".join(words)
+    cut = " ".join(words[:max_words])
+    end = max(cut.rfind(". "), cut.rfind("; "), cut.rfind("! "))
+    return (cut[:end + 1] if end > 0 else cut.rstrip(",;:") + "...").strip()
+
+
 def _violation(d: DesignResult) -> float:
     return sum(v.amount for v in d.score.violations if v.hard)
 
@@ -352,6 +362,11 @@ class Investigator:
             if pr.get("metric") not in self.metric_names:
                 raise ValueError("unknown metric %r" % pr.get("metric"))
             lo, hi = sorted((float(pr["pct_low"]), float(pr["pct_high"])))
+            # "down 16-50%" written as [16, 50]: the direction disambiguates, so normalize the sign.
+            if pr["direction"] == "down" and lo > 0:
+                lo, hi = -hi, -lo
+            elif pr["direction"] == "up" and hi < 0:
+                lo, hi = -hi, -lo
             if (pr["direction"] == "up" and hi <= 0) or (pr["direction"] == "down" and lo >= 0):
                 raise ValueError("prediction for %s: direction %s contradicts range [%s, %s]"
                                  % (pr["metric"], pr["direction"], lo, hi))
@@ -359,8 +374,7 @@ class Investigator:
         objective = [o.metric for o in self.goal.objectives]
         if not any(p.metric in objective for p in preds):
             raise ValueError("predict the goal metric(s) %s" % ", ".join(objective))
-        rationale, _ = scrub_claims(" ".join(str(data.get("rationale", "")).split()[:40]),
-                                    self._plan_block(step, sims_left))
+        rationale, _ = scrub_claims(_clip(str(data.get("rationale", "")), 55), self._plan_block(step, sims_left))
         return Hypothesis(step=step, levers=levers, candidates=cands, principle_ids=pids, rationale=rationale,
                           predictions=preds, source="llm"), ""
 
@@ -438,8 +452,8 @@ class Investigator:
                                      investigator_analyze_schema(),
                                      model=llm.deep_model() if llm.provider_name() == "anthropic" else None,
                                      max_tokens=600, budget=self.llm_budget)
-                expl, _ = scrub_claims(" ".join(str(res.data.get("explanation", "")).split()[:60]), block)
-                lesson, _ = scrub_claims(" ".join(str(res.data.get("lesson", "")).split()[:20]), block)
+                expl, _ = scrub_claims(_clip(str(res.data.get("explanation", "")), 80), block)
+                lesson, _ = scrub_claims(_clip(str(res.data.get("lesson", "")), 30), block)
                 if expl:
                     return expl, lesson
             except (llm.LLMUnavailable, llm.BudgetExceeded) as e:

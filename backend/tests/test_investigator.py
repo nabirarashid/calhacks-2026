@@ -66,7 +66,7 @@ def test_plan_validation_rejects_bad_hypotheses():
         dict(ok, candidates=[{"settings": [{"param": "span_mm", "value": 5000}]}]),        # out of bounds
         dict(ok, candidates=[{"settings": [{"param": "aoa_deg", "value": 8}]}]),           # not a lever
         dict(ok, predictions=[{"metric": "drag_n", "direction": "up", "pct_low": 1, "pct_high": 2}]),  # no goal metric
-        dict(ok, predictions=[{"metric": "downforce_n", "direction": "up", "pct_low": -9, "pct_high": -1}]),
+        dict(ok, predictions=[{"metric": "downforce_n", "direction": "up", "pct_low": -9, "pct_high": 0}]),
         dict(ok, candidates=[{"settings": [{"param": "span_mm", "value": inv.current.params["span_mm"]}]}]),  # seen
         dict(ok, stop=True, stop_reason="bored"),                                           # too early
     ]
@@ -138,3 +138,28 @@ def test_consecutive_rejections_rule_a_lever_out():
         steps = [r for r in results if lever in next(e["payload"]["levers"] for e in events
                                                     if e["type"] == "step_planned" and e["payload"]["step"] == r["step"])]
         assert [r["verdict"] for r in steps][-2:] in (["rejected", "pivot"], ["pivot", "pivot"])
+
+
+def test_down_prediction_written_as_positive_magnitudes_is_normalized():
+    inv = _inv()
+    inv.current = inv._evaluate(inv.start_params, 0, "seed", 0, "seed", "", [])
+    plan = {"stop": False, "levers": ["aoa_deg"], "principle_ids": [], "rationale": "more angle",
+            "candidates": [{"settings": [{"param": "aoa_deg", "value": 9}]}],
+            "predictions": [{"metric": "downforce_n", "direction": "up", "pct_low": 5, "pct_high": 15},
+                            {"metric": "stall_margin_deg", "direction": "down", "pct_low": 16, "pct_high": 50}]}
+    hyp, _ = inv._validate_plan(plan, 1, 20)
+    sm = next(p for p in hyp.predictions if p.metric == "stall_margin_deg")
+    assert (sm.pct_low, sm.pct_high) == (-50.0, -16.0)
+
+
+def test_clip_ends_at_a_sentence():
+    from backend.investigator import _clip
+    text = "First sentence is short. " + "word " * 40
+    assert _clip(text, 20) == "First sentence is short."
+    assert _clip("a b c", 20) == "a b c"
+
+
+def test_claim_check_accepts_magnitudes():
+    from backend.agents.base import unverified_numbers
+    assert unverified_numbers("stall margin fell 22.3%", {"pct": -22.338}) == []
+    assert unverified_numbers("it fell 41.0%", {"pct": -22.338}) == ["41.0"]

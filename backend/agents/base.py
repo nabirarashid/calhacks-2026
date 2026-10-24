@@ -136,7 +136,9 @@ def unverified_numbers(text: str, source: Any, rel_tol: float = 0.02) -> List[st
         x = float(tok)
         if x.is_integer() and abs(x) <= 10:
             continue
-        if not any(abs(x - k) <= rel_tol * max(abs(k), 1e-9) or abs(x - k) < 1e-6 for k in known):
+        # Sign-insensitive: prose says "fell 22.3%" for a change of -22.3.
+        if not any(abs(abs(x) - abs(k)) <= rel_tol * max(abs(k), 1e-9) or abs(abs(x) - abs(k)) < 1e-6
+                   for k in known):
             bad.append(tok)
     return bad
 
