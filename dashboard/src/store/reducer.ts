@@ -13,6 +13,7 @@ import type {
   MetricInfo,
   RunSummary,
 } from '@shared/contracts';
+import type { DesignApplied, Hypothesis, Notebook, StepResult } from '@shared/investigation';
 
 export type BaselineMethod = BaselineProgressPayload['method'];
 
@@ -40,6 +41,10 @@ export interface RunFoldState {
   budget: BudgetStatus | null;
   paretoIds: string[];
   errors: ErrorPayload[];
+  hypotheses: Hypothesis[];
+  stepResults: StepResult[];
+  notebook: Notebook;
+  appliedDesigns: DesignApplied[];
 }
 
 export interface FoldedDashboardState {
@@ -72,6 +77,10 @@ export function emptyRunState(runId: string): RunFoldState {
     budget: null,
     paretoIds: [],
     errors: [],
+    hypotheses: [],
+    stepResults: [],
+    notebook: { beliefs: [], lever_effects: {}, ruled_out: [], accuracy: [] },
+    appliedDesigns: [],
   };
 }
 
@@ -265,11 +274,36 @@ export function reduceEvent(state: RunFoldState, event: AnyDarwinEvent): RunFold
       return next;
 
     case 'step_planned':
+      return {
+        ...next,
+        hypotheses: [
+          ...next.hypotheses.filter((item) => item.step !== event.payload.step),
+          event.payload,
+        ].sort((a, b) => a.step - b.step),
+      };
+
     case 'step_result':
+      return {
+        ...next,
+        stepResults: [
+          ...next.stepResults.filter((item) => item.step !== event.payload.step),
+          event.payload,
+        ].sort((a, b) => a.step - b.step),
+      };
+
     case 'notebook_updated':
-    case 'design_applied':
-      // contracts v1.2: the investigation loop. W-D renders these in the /panel route (D2).
-      return next;
+      return { ...next, notebook: event.payload };
+
+    case 'design_applied': {
+      const { design_id, geometry } = event.payload;
+      next = {
+        ...next,
+        appliedDesigns: [...next.appliedDesigns, event.payload],
+        geometriesByDesignId: { ...next.geometriesByDesignId, [design_id]: geometry },
+      };
+      const design = next.designsById[design_id];
+      return design ? replaceDesign(next, { ...design, geometry }) : next;
+    }
 
     default: {
       const exhaustive: never = event;

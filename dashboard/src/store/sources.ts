@@ -32,6 +32,11 @@ const EVENT_TYPES: ReadonlySet<EventType> = new Set([
   'budget_update',
   'run_complete',
   'error',
+  'analysis_progress',
+  'step_planned',
+  'step_result',
+  'notebook_updated',
+  'design_applied',
 ]);
 
 function asObserver(

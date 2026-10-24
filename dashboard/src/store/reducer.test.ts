@@ -19,6 +19,10 @@ const fixture = readFileSync(
   'utf8',
 );
 const events = parseJsonl(fixture);
+const investigationEvents = parseJsonl(readFileSync(
+  new URL('../../../shared/fixtures/v2/sample_investigation.jsonl', import.meta.url),
+  'utf8',
+));
 const completeEvent = events.find(
   (event): event is Extract<AnyDarwinEvent, { type: 'run_complete' }> => event.type === 'run_complete',
 );
@@ -92,6 +96,21 @@ describe('event fold', () => {
     };
 
     expect(reduceEvent(emptyRunState('run_errors'), event).errors).toEqual([payload]);
+  });
+
+  it('folds the investigation timeline, notebook, and applied designs', () => {
+    const state = foldRunEvents(investigationEvents);
+
+    expect(state.runId).toBe('session_fixture_wing');
+    expect(state.hypotheses).toHaveLength(6);
+    expect(state.stepResults).toHaveLength(6);
+    expect(state.stepResults.some((result) => result.verdict === 'rejected')).toBe(true);
+    expect(state.stepResults.some((result) => result.verdict === 'pivot')).toBe(true);
+    expect(state.notebook.accuracy).toHaveLength(6);
+    expect(state.notebook.accuracy.at(-1)).toBeGreaterThan(state.notebook.accuracy[0]);
+    expect(state.appliedDesigns.length).toBeGreaterThan(1);
+    expect(state.appliedDesigns.at(-1)?.version).toMatch(/^Darwin:/);
+    expect(state.geometriesByDesignId[state.appliedDesigns.at(-1)!.design_id]).toBeDefined();
   });
 });
 
