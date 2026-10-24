@@ -1,13 +1,14 @@
-import type { AgentMessage, DesignResult, GeometryRef, RunSummary, Score } from '@shared/contracts';
+import type { AgentMessage, DesignResult, RunSummary, Score } from '@shared/contracts';
 import { useMemo, useState } from 'react';
+import { constraintReview, correctionSequence, parameterChanges } from './winnerReview';
 
 interface WinnerModalProps {
   summary: RunSummary;
+  designs: DesignResult[];
   critic?: AgentMessage;
   docUrl?: string | null;
   onClose: () => void;
-  onCommit: (design: DesignResult) => Promise<GeometryRef>;
-  onExport: (design: DesignResult) => Promise<void>;
+  onApprove: (design: DesignResult, approvedBy?: string) => Promise<unknown>;
   onReport: () => void;
 }
 
@@ -23,17 +24,22 @@ function HifiCheck({ score }: { score?: Score | null }) {
   );
 }
 
-export function WinnerModal({ summary, critic, docUrl, onClose, onCommit, onExport, onReport }: WinnerModalProps) {
+export function WinnerModal({ summary, designs, critic, docUrl, onClose, onApprove, onReport }: WinnerModalProps) {
   const champion = summary.champion;
   const seed = summary.seed_design;
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [approvedBy, setApprovedBy] = useState('');
   const baseline = useMemo(() => {
     const entries = Object.entries(summary.baseline_best);
     return entries.sort(([, a], [, b]) => b.score.aggregate - a.score.aggregate)[0];
   }, [summary.baseline_best]);
 
   if (!champion) return null;
+  const changes = parameterChanges(seed, champion);
+  const constraints = constraintReview(summary.goal, champion);
+  const sequence = correctionSequence(designs, champion);
+  const geometry = champion.geometry;
   const runAction = async (name: string, action: () => Promise<unknown>) => {
     setBusy(name);
     setFeedback(null);
@@ -104,12 +110,56 @@ export function WinnerModal({ summary, critic, docUrl, onClose, onCommit, onExpo
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
-          {docUrl ? <a className="control-button secondary" href={docUrl} target="_blank" rel="noreferrer">Open in Onshape ↗</a> : null}
-          <button className="control-button secondary" disabled={busy !== null} onClick={() => void runAction('Commit', () => onCommit(champion))}>Commit to Onshape</button>
-          <button className="control-button secondary" disabled={busy !== null} onClick={() => void runAction('Export', () => onExport(champion))}>Export print</button>
-          <button className="control-button primary" type="button" onClick={onReport}>Engineering report</button>
+          <label className="flex items-center gap-2 text-xs text-slate-400">Approved by
+            <input className="w-36 rounded-md border border-line bg-ink px-2 py-1.5 text-xs text-white" value={approvedBy} onChange={(event) => setApprovedBy(event.target.value)} placeholder="Name (optional)" />
+          </label>
+          <button className="control-button primary" type="button" disabled={busy !== null} onClick={() => void runAction('Approve design', () => onApprove(champion, approvedBy.trim() || undefined))}>Approve design</button>
+          <button className="control-button secondary" type="button" onClick={onReport}>Engineering report</button>
           {feedback ? <span className="ml-auto font-mono text-[10px] text-slate-400">{feedback}</span> : null}
         </div>
+
+        <section className="mt-5 grid gap-4 lg:grid-cols-2">
+          <div className="rounded-xl border border-line bg-ink/50 p-3">
+            <div className="eyebrow">Seed → champion parameters</div>
+            {changes.length ? <div className="mt-2 max-h-36 overflow-auto">
+              <table className="w-full text-left text-[11px]"><thead className="font-mono text-[9px] uppercase text-slate-600"><tr><th>Parameter</th><th>Seed</th><th>Champion</th></tr></thead><tbody>
+                {changes.map((change) => <tr className="border-t border-line/60" key={change.name}><td className="py-1.5 text-slate-400">{change.name}</td><td className="font-mono text-slate-500">{change.before}</td><td className="font-mono text-white">{change.after}</td></tr>)}
+              </tbody></table>
+            </div> : <p className="mt-2 text-xs text-slate-500">No parameter changes from the seed.</p>}
+          </div>
+          <div className="rounded-xl border border-line bg-ink/50 p-3">
+            <div className="eyebrow">CAD regeneration evidence</div>
+            <p className={`mt-2 text-xs ${geometry?.status === 'ready' ? 'text-mint' : 'text-amber'}`}>
+              {geometry?.status === 'ready'
+                ? `Geometry ready · ${geometry.regen_status || 'regeneration status unavailable'} · ${geometry.triangles ?? '—'} triangles · ${geometry.source}`
+                : geometry?.status === 'failed'
+                  ? `Geometry generation failed${geometry.regen_status ? ` · ${geometry.regen_status}` : ''}${geometry.error ? ` · ${geometry.error}` : ''}`
+                  : geometry?.status === 'skipped'
+                    ? `Geometry generation skipped${geometry.error ? ` · ${geometry.error}` : ''}`
+                    : geometry?.status === 'pending'
+                      ? 'Geometry generation is pending.'
+                      : 'No CAD regeneration result was recorded for this champion.'}
+            </p>
+            {geometry?.status === 'ready' && docUrl ? <a className="mt-2 inline-block text-xs text-cyan" href={docUrl} target="_blank" rel="noreferrer">Open Onshape document ↗</a> : null}
+          </div>
+        </section>
+
+        <section className="mt-4 rounded-xl border border-line bg-ink/50 p-3">
+          <div className="eyebrow">Goal constraint review</div>
+          {constraints.length ? <div className="mt-2 overflow-x-auto"><table className="w-full text-left text-[11px]"><thead className="font-mono text-[9px] uppercase text-slate-600"><tr><th>Constraint</th><th>Actual</th><th>Limit</th><th>Margin</th><th>Result</th></tr></thead><tbody>
+            {constraints.map((item) => <tr className="border-t border-line/60" key={`${item.ref}:${item.op}:${item.limit}`}><td className="py-1.5 text-slate-400">{item.label || item.ref}{item.hard ? ' · hard' : ' · soft'}</td><td className="font-mono">{item.actual?.toFixed(3) ?? 'Unavailable'}</td><td className="font-mono">{item.op} {item.limit}</td><td className="font-mono">{item.margin?.toFixed(3) ?? '—'}</td><td className={item.passed === null ? 'text-amber' : item.passed ? 'text-mint' : 'text-rose-400'}>{item.passed === null ? 'Unknown' : item.passed ? 'Pass' : 'Fail'}</td></tr>)}
+          </tbody></table></div> : <p className="mt-2 text-xs text-slate-500">No constraints were specified for this goal.</p>}
+        </section>
+
+        <section className="mt-4 rounded-xl border border-line bg-ink/50 p-3">
+          <div className="eyebrow">Failure → correction sequence</div>
+          <ol className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+            {sequence.map((design, index) => <li className="flex items-center gap-2" key={design.design_id}>
+              {index ? <span className="text-slate-600">→</span> : null}
+              <span className="rounded-lg border border-line px-2 py-1.5"><span className={design.score.feasible ? 'text-mint' : 'text-rose-400'}>{design.score.feasible ? 'Feasible' : 'Constraint failure'}</span><span className="ml-2 font-mono text-slate-500">g{design.generation} · {design.design_id.split('-').at(-1)}</span></span>
+            </li>)}
+          </ol>
+        </section>
       </div>
     </div>
   );

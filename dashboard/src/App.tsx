@@ -1,7 +1,6 @@
 import type { AnyDarwinEvent, DesignResult, DesignSpace, Goal, HealthResponse, Preset, RunSummary } from '@shared/contracts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { DiscoveryModal } from '@/components/DiscoveryModal';
 import { GoalComposer } from '@/components/GoalComposer';
 import { MetricChips } from '@/components/MetricChips';
 import {
@@ -14,7 +13,7 @@ import {
   ScoreChart,
 } from '@/components/panels';
 import { WinnerModal } from '@/components/WinnerModal';
-import { api, downloadPrintPackage } from '@/lib/api';
+import { api } from '@/lib/api';
 import {
   fileSource,
   parseJsonl,
@@ -139,7 +138,6 @@ export default function App() {
   const [sourceKind, setSourceKind] = useState<SourceKind>('idle');
   const [winnerOpen, setWinnerOpen] = useState(false);
   const [reportRunId, setReportRunId] = useState<string | null>(null);
-  const [discoveryOpen, setDiscoveryOpen] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [notice, setNotice] = useState<string | null>(null);
   const [startupError, setStartupError] = useState<string | null>(null);
@@ -285,7 +283,6 @@ export default function App() {
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             {running && activeRun ? <button className="control-button danger" onClick={() => void api.stopRun(activeRun.runId)}>Stop</button> : null}
             <ReplayControls runs={runList} disabled={Boolean(running)} onReplay={replayRecording} onInspect={inspectRun} onFile={replayFile} />
-            <button className="control-button secondary" type="button" onClick={() => setDiscoveryOpen(true)}>Discover</button>
             <button className="icon-button" type="button" aria-label="Toggle color theme" title="Toggle color theme" onClick={() => setTheme((value) => value === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☼' : '◐'}</button>
             <StatusPill sourceKind={sourceKind} sourceStatus={sourceStatus} summary={activeRun?.summary} connected={Boolean(health?.ok)} />
           </div>
@@ -343,16 +340,15 @@ export default function App() {
       {winnerOpen && activeRun?.summary?.status === 'complete' ? (
         <WinnerModal
           summary={activeRun.summary}
+          designs={activeRun.designs}
           critic={critic}
           docUrl={activeRun.designSpace?.source.doc_url}
           onClose={() => setWinnerOpen(false)}
-          onCommit={(design) => api.commit(activeRun.runId, design.design_id)}
-          onExport={(design) => downloadPrintPackage(activeRun.runId, design.design_id)}
+          onApprove={(design, approvedBy) => api.approve(activeRun.runId, design.design_id, approvedBy)}
           onReport={() => setReportRunId(activeRun.runId)}
         />
       ) : null}
       {reportRunId ? <ReportViewer runId={reportRunId} onClose={() => setReportRunId(null)} /> : null}
-      {discoveryOpen ? <DiscoveryModal onClose={() => setDiscoveryOpen(false)} onDiscover={api.discover} onUse={(space) => { setSpaces((current) => [...current.filter((item) => item.id !== space.id), space]); setSelectedSpaceId(space.id); setGoal(null); setDiscoveryOpen(false); setNotice(`Discovered ${space.parameters.length} parameters. Confirm a goal to start.`); }} /> : null}
       {notice ? <div className="toast" role="status"><span>!</span>{notice}</div> : null}
     </div>
   );

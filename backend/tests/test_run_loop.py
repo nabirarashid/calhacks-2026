@@ -154,6 +154,6 @@ def test_server_routes():
     if champ["geometry"] and champ["geometry"]["status"] == "ready":
         assert c.get(champ["geometry"]["stl_url"]).status_code == 200
     assert c.post("/api/runs/%s/export" % rid, json={"design_id": champ["design_id"]}).status_code == 200
-    assert "Darwin run" in c.get("/api/runs/%s/report" % rid).text
+    assert "Darwin engineering evidence" in c.get("/api/runs/%s/report" % rid).text
     rep = c.post("/api/replay", json={"recording": "sample_run.jsonl", "speed": 500}).json()["run_id"]
     assert rep.startswith("replay_")

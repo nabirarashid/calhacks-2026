@@ -16,7 +16,7 @@ from shared.contracts import (
     CONTRACT_VERSION, BudgetStatus, DesignSpace, Goal, ModelBudget, RunConfig, RunSummary,
 )
 
-from backend import llm, replay
+from backend import evidence, llm, replay
 from backend.agents import goal_parser
 from backend.bus import Bus, runs_dir
 from backend.run_loop import RunController, new_run_id
@@ -54,6 +54,10 @@ class ReplayRequest(BaseModel):
 
 class DesignRequest(BaseModel):
     design_id: str
+
+
+class ApprovalRequest(DesignRequest):
+    approved_by: str = "engineer"
 
 
 class DiscoverRequest(BaseModel):
@@ -236,6 +240,38 @@ def commit(run_id: str, req: DesignRequest) -> Dict[str, Any]:
     return W.cad.commit_to_document(space, d["params"]).model_dump(mode="json")
 
 
+@app.post("/api/runs/{run_id}/approve")
+def approve(run_id: str, req: ApprovalRequest) -> Dict[str, Any]:
+    summary = _summary(run_id)
+    design = _find_design(run_id, req.design_id)
+    champion = summary.get("champion") or {}
+    if champion.get("design_id") != design.get("design_id"):
+        raise HTTPException(409, "only the completed run champion can be approved")
+    try:
+        return evidence.approve(run_id, summary, design, req.approved_by)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+
+
+@app.get("/api/runs/{run_id}/approve")
+def approval(run_id: str) -> Dict[str, Any]:
+    summary = _summary(run_id)
+    design = summary.get("champion") or {}
+    record = evidence.load_approval(run_id, design)
+    if record is None:
+        raise HTTPException(404, "this champion has not been approved")
+    return record
+
+
+@app.get("/api/runs/{run_id}/evidence")
+def run_evidence(run_id: str) -> Dict[str, Any]:
+    summary = _summary(run_id)
+    design = summary.get("champion")
+    if not design:
+        raise HTTPException(409, "run has no champion yet")
+    return evidence.build_evidence(run_id, summary, design)
+
+
 @app.post("/api/runs/{run_id}/export")
 def export(run_id: str, req: DesignRequest) -> FileResponse:
     d = _find_design(run_id, req.design_id)
@@ -251,23 +287,19 @@ def export(run_id: str, req: DesignRequest) -> FileResponse:
 
 @app.get("/api/runs/{run_id}/report")
 def report(run_id: str) -> HTMLResponse:
-    """Tier 1 placeholder report; the full engineering report lands in Tier 3 (backend/report.py)."""
-    s = RunSummary.model_validate(_summary(run_id))
+    """Deterministic engineering evidence report; LLM prose is supplemental only."""
+    summary = _summary(run_id)
+    s = RunSummary.model_validate(summary)
     narrative = ""
     for ev in reversed(_events(run_id)):
         m = ev["payload"].get("message") if ev["type"] == "agent_message" else None
         if m and m["agent"] == "reporter":
             narrative = "<h2>%s</h2><p>%s</p>" % (html.escape(m["summary"]), html.escape(m["body"]).replace("\n", "<br>"))
             break
-    rows = ""
-    if s.champion and s.seed_design:
-        for k, v in s.champion.score.metrics.items():
-            rows += "<tr><td>%s</td><td>%.3f</td><td>%.3f</td></tr>" % (html.escape(k), s.seed_design.score.metrics.get(k, 0), v)
-    return HTMLResponse("<!doctype html><meta charset=utf-8><title>Darwin report %s</title>"
-                        "<body style='font-family:system-ui;max-width:860px;margin:2rem auto'>"
-                        "<h1>Darwin run %s</h1><p><b>Goal:</b> %s</p>%s"
-                        "<table border=1 cellpadding=4><tr><th>metric</th><th>seed</th><th>champion</th></tr>%s</table>"
-                        % (s.run_id, s.run_id, html.escape(s.goal.source_text), narrative, rows))
+    if not s.champion:
+        raise HTTPException(409, "run has no champion yet")
+    data = evidence.build_evidence(run_id, summary, s.champion.model_dump(mode="json"))
+    return HTMLResponse(evidence.render_html(data, narrative))
 
 
 @app.get("/api/budget")

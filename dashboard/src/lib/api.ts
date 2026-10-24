@@ -71,6 +71,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ design_id: designId }),
     }),
+  approve: (runId: string, designId: string, approvedBy?: string) =>
+    request<{ status: string }>(`/api/runs/${runId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ design_id: designId, ...(approvedBy ? { approved_by: approvedBy } : {}) }),
+    }),
   discover: (docUrl: string, probe: boolean) =>
     request<DesignSpace>('/api/discover', {
       method: 'POST',

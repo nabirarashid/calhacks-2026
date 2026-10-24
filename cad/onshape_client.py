@@ -142,6 +142,89 @@ class OnshapeClient(object):
             purpose, path_template="/elements/d/{did}/w/{wid}/e/{eid}/configuration",
         ).json()
 
+    def update_configuration(self, did: str, wid: str, eid: str,
+                             configuration: Dict,
+                             purpose: str = "commit") -> Dict:
+        """POST a complete, caller-vetted configuration representation.
+
+        Onshape documents ``POST /elements/.../configuration`` as the update
+        endpoint.  This method deliberately does *not* manufacture its body:
+        quantity/list parameter objects are document- and API-version-specific,
+        so callers must start from a developer-verified GET representation.
+        Keeping that decision outside the transport layer prevents a guessed
+        payload from changing a real document.
+        """
+        if not isinstance(configuration, dict) or not configuration:
+            raise ValueError("configuration update requires a non-empty vetted payload")
+        return self.request(
+            "POST", "/elements/d/%s/w/%s/e/%s/configuration" % (did, wid, eid),
+            purpose, path_template="/elements/d/{did}/w/{wid}/e/{eid}/configuration",
+            headers={"Content-Type": "application/json"}, json_body=configuration,
+        ).json()
+
+    @staticmethod
+    def current_configuration_values(configuration: Dict) -> Dict[str, object]:
+        """Read the documented ``currentConfiguration`` values from a response.
+
+        This intentionally refuses malformed entries instead of treating a
+        missing value as a successful verification.
+        """
+        rows = configuration.get("currentConfiguration")
+        if not isinstance(rows, list):
+            raise ValueError("configuration response has no currentConfiguration list")
+        out = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                raise ValueError("configuration response contains a malformed value")
+            parameter_id = row.get("parameterId")
+            if not isinstance(parameter_id, str) or not parameter_id or "value" not in row:
+                raise ValueError("configuration response entry lacks parameterId/value")
+            if parameter_id in out:
+                raise ValueError("configuration response repeats a parameterId")
+            out[parameter_id] = row["value"]
+        return out
+
+    def verify_configuration(self, did: str, wid: str, eid: str,
+                             expected: Dict[str, object],
+                             purpose: str = "commit_verify") -> Dict:
+        """Read back configuration values and return a strict verification result.
+
+        A caller should create a named version only after ``ok`` is true and a
+        separately exported STL has passed its geometry sanity check.
+        """
+        if not isinstance(expected, dict) or not expected:
+            raise ValueError("configuration verification requires expected values")
+        observed = self.current_configuration_values(
+            self.get_configuration(did, wid, eid, purpose=purpose))
+        missing = sorted(key for key in expected if key not in observed)
+        mismatched = {
+            key: {"expected": expected[key], "observed": observed[key]}
+            for key in expected
+            if key in observed and observed[key] != expected[key]
+        }
+        return {
+            "ok": not missing and not mismatched,
+            "missing": missing,
+            "mismatched": mismatched,
+        }
+
+    def create_version(self, did: str, wid: str, name: str,
+                       purpose: str = "commit_version") -> Dict:
+        """Create a named version from a workspace using Onshape's v10 API.
+
+        This is intentionally a primitive, not an implicit follow-up to a
+        configuration write.  The caller must verify both the write and the
+        regenerated geometry first.
+        """
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("version name is required")
+        return self.request(
+            "POST", "/documents/d/%s/versions" % did, purpose,
+            path_template="/documents/d/{did}/versions",
+            headers={"Content-Type": "application/json"},
+            json_body={"documentId": did, "workspaceId": wid, "name": name.strip()},
+        ).json()
+
     def get_features(self, did: str, wid: str, eid: str,
                      purpose: str = "discover") -> Dict:
         """Feature list, for the assignVariable fallback path. 1 call."""

@@ -159,15 +159,46 @@ def build_geometry(space: DesignSpace, params: Dict[str, ParamValue],
 
 
 def commit_to_document(space: DesignSpace, params: Dict[str, ParamValue]) -> GeometryRef:
-    """Write the champion into the Onshape doc so it is visible in the UI.
+    """Persist a champion only after an explicitly enabled, verified workflow.
 
-    Needs spike step 7 (can POST /elements/.../configuration set defaults in 1
-    call?) before it can be implemented cheaply.
+    This public entry point is deliberately fail-closed.  A configured STL
+    export is read-only; it must never be described as a committed document
+    change.  The low-level client exposes the official update/read-back/version
+    endpoints, but this repository has no recorded, document-specific update
+    body for the configuration's quantity/list parameter objects.  Constructing
+    one from canonical parameters would be a write-schema guess.
+
+    Consequently even the explicit opt-in is a guard, not permission to make a
+    speculative POST.  A developer must first record a verified payload shape
+    for an isolated development workspace, then wire a workflow that performs:
+    update -> exact read-back -> configured STL sanity check -> named version.
+    Until then this function makes zero network calls and returns a non-ready
+    GeometryRef that callers can surface honestly.
     """
     started = time.time()
-    canon = canonicalize(space, params)
-    return _fail(geometry_key(space, canon),
-                 "commit_to_document pending spike step 7", started)
+    try:
+        canon = canonicalize(space, params)
+        key = geometry_key(space, canon)
+    except Exception as exc:
+        return _fail("invalid", "canonicalize failed: %s" % exc, started,
+                     regen="ERROR")
+
+    if os.environ.get("DARWIN_ONSHAPE_WRITE") != "1":
+        return _fail(key, "onshape_write_disabled", started,
+                     regen="NOT_ATTEMPTED", status="skipped")
+
+    # A second acknowledgement is required because an API POST only accepts a
+    # workspace, and the URL alone cannot establish that it is an isolated dev
+    # workspace rather than the shared/prod document.
+    if os.environ.get("DARWIN_ONSHAPE_WRITE_ISOLATED") != "1":
+        return _fail(key, "onshape_write_requires_isolated_workspace", started,
+                     regen="NOT_ATTEMPTED", status="skipped")
+
+    return _fail(
+        key,
+        "onshape_write_schema_unverified: no developer-verified configuration "
+        "update payload is recorded; no POST attempted",
+        started, regen="NOT_ATTEMPTED", status="skipped")
 
 
 def export_print_package(space: DesignSpace, params: Dict[str, ParamValue],

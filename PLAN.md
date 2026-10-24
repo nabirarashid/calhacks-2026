@@ -1,5 +1,100 @@
 # Darwin: build plan (Cal Hacks 13.0)
 
+## Active implementation plan — engineering-change handoff (Sat Oct 24)
+
+This section is the current execution plan and overrides later Tier 3/stretch
+language where the two conflict. The fin remains the single judged object. The
+goal is to finish the missing review, approval, evidence, and honest Onshape
+handoff around the working optimization loop; a drone arm, structural FEA,
+arbitrary feature generation, and a second scorer are post-hackathon work.
+
+**Working branch:** `codex/onshape-change-workflow`
+
+**Verified starting point:** `main` was clean and fast-forwarded to
+`origin/main` at `ccf4d17`. The existing system parses goals, searches the
+`fin_v1` space, evaluates deterministic physics, diagnoses failed candidates,
+runs matched-budget baselines, regenerates configured geometry through
+Onshape, performs a higher-fidelity check, records JSONL, and replays offline.
+Configured export is a real Onshape regeneration but is read-only: it does not
+persist the selected values into the document.
+
+### P0 — required before the judged build
+
+Execution status (updated during implementation): deterministic evidence and
+approval endpoints and the review UI are implemented and tested. CAD now has
+ledgered update/read-back/version primitives plus explicit fail-closed write
+guards. Live persistence remains blocked: the repository has neither a
+developer-verified quantity/list configuration update payload nor a trustworthy
+binding to an isolated development workspace. `commit_to_document` therefore
+returns `skipped` with zero network calls even after opt-in. No external Onshape
+write has been attempted.
+
+- [x] **Engineering diff:** show seed-to-champion parameter changes, metric
+  changes, every hard requirement with actual/limit/margin/pass-fail, CAD
+  regeneration evidence, and high-fidelity warnings.
+- [x] **Failure-to-correction story:** derive a short, data-backed sequence from
+  evaluated designs (failed candidate, failed requirement, subsequent passing
+  candidate). Never invent causal or numeric claims.
+- [x] **Human approval:** approve one exact `run_id` + `design_id` +
+  `param_hash`, persist an audit record under runtime `.darwin/`, and invalidate
+  the approval if the selected design changes.
+- [x] **Evidence report:** deterministically render request, assumptions,
+  parameter diff, requirements and margins, geometry evidence, high-fidelity
+  result, budgets/degradations, limitations, and approval state. LLM prose is
+  optional context only; it never supplies report numbers or pass/fail.
+- [x] **Honest controls:** no visible button may return `501`, and a failed or
+  skipped `GeometryRef` must never be reported as a successful commit. Hide
+  generic discovery and unsupported handoff claims from the judged path.
+- [ ] **Persistent Onshape handoff:** implement only behind explicit write
+  opt-in and only if the configuration update and version workflow can be
+  established from official API behavior and covered by mocked tests. Verify
+  the written values and regenerated geometry before claiming success. If a
+  safe write path is not established, retain the zero-write configured export,
+  label it accurately, and stop this item rather than guessing.
+- [ ] **Integration:** Python tests, dashboard tests/build, secrets check, one
+  real dry run, one offline replay, evidence/report inspection, and a two-minute
+  rehearsal with no terminal or broken control.
+
+### Stop conditions
+
+Stop the affected workstream and report the blocker if the worktree contains
+unexpected user changes, `main` cannot fast-forward, an Onshape write schema is
+ambiguous, a write cannot be verified, rollback/recovery is unclear, tests
+regress outside the changed area, credentials or document identifiers would be
+exposed, or the API budget floor would be crossed. Do not experiment with
+writes against the production document; use mocked tests first and a designated
+development copy only after explicit write opt-in.
+
+### P1 — only after P0 is rehearsed
+
+1. Numeric-claim validation for critic/reporter prose.
+2. Read-only CAD preflight: parameter names, units, ranges, source revision,
+   seed regeneration, scorer availability.
+3. A truly isolated Onshape workspace/branch followed by apply, verify, and
+   named-version creation. Creating a version alone is not sufficient because
+   it only snapshots the current workspace.
+
+### Latest verification
+
+- Python 3.9 compile, contracts, and full tests: **94 passed**.
+- Dashboard unit tests: **18 passed**; production TypeScript/Vite build passed
+  with the existing large-chunk warning.
+- Secrets scan and `git diff --check`: passed.
+- Offline replay visual QA: passed; the winner modal scrolls correctly and
+  displays parameter changes, requirement margins, CAD evidence, approval, and
+  the failure-to-correction sequence.
+- Live Onshape write: **not attempted**. It remains the only blocked P0 item and
+  requires an explicitly designated disposable development workspace plus a
+  developer-verified configuration update payload before the guard may be
+  removed.
+
+### Post-hackathon
+
+Add a structural `SolverAdapter` on a controlled second part only after the fin
+workflow is complete. The second part must have a defensible load case, material
+model, mesh-convergence check, manufacturing rules, and an evidence schema. It
+is the proof of multi-domain architecture, not part of the current submission.
+
 > **Read me first.** This file is the single source of truth for four people and four Claude Code agents working in parallel.
 > - **Part B is the contract.** After checkpoint CP0 (Fri 20:30), `shared/` is **frozen**. No agent edits `shared/` or another section's folder. If a contract looks wrong, write the request in your own section's `CONTRACT_REQUESTS.md`, and the contract owner (S3) decides.
 > - Each Part C section is meant to be read alone together with Part B. Agents: read **A, B, your own section of C, and D**. Skip the rest.
