@@ -127,8 +127,10 @@ and `run_complete` are reused unchanged. W-D adds the reducer cases.
 | `POST /api/sessions/{run_id}/stop` | Stops after the current step |
 | `POST /api/inspect` | `{doc_url}` → the document's parameters (name, unit, current value, range) for the panel's "what I'll change / keep" list |
 
-### B.6 CAD apply API (owner W-A; the mechanism is chosen by the morph spike)
-- `cad.apply_values(space, params) -> GeometryRef`: writes values so the open tab regenerates. Then read back and verify.
+### B.6 CAD apply API (owner W-A). Mechanism decided by the morph spike (14:49, `cad/SPIKE.md`)
+- **Feature/variable updates morph open tabs live (~0.5 s per write); configuration updates do not.**
+- `cad.apply_values(space, params) -> GeometryRef`: for each changed param, GET features → update the
+  matching **Variable feature**'s value expression → POST feature update → re-export and verify.
 - `cad.create_version(space, name) -> str`
 - Both are ledgered and refused below the budget reserve. Writes go only to documents whose
   env var is listed in `DARWIN_ONSHAPE_WRITE_DOCS` (comma-separated env var names).
@@ -136,12 +138,15 @@ and `run_complete` are reused unchanged. W-D adds the reducer cases.
 ## Part C: Workstreams (adapt names as needed)
 
 ### W-A: Onshape (cad/, Part Studios, extension ↔ Onshape glue)
-- [ ] **A1 (by 16:00) Morph spike** on a throwaway copy. Does an API write make an *open* tab
+- [x] **A1 Morph spike: done 14:49 by W-C.** Verdict: feature/variable updates morph live, configuration
+  updates don't. Details in `cad/SPIKE.md` "Morph spike". Original instructions, kept for reference:
+  on a throwaway copy, Does an API write make an *open* tab
   visibly regenerate within about 2 s? Try in order: (a) the existing configuration update
   (`cad/onshape_client.update_configuration`), (b) updating a Variable feature's value via
   feature update, (c) the Variable Studio API. Record mechanism, latency, calls per write and
   any gotchas in `cad/SPIKE.md` under "Morph". **This decides whether the morph is live.**
-- [ ] **A2 (by 18:00)** Rear-wing Part Studio: inputs for the B.4 editable params, fixed
+- [ ] **A2 (by 18:00)** Rear-wing Part Studio: **Variable features** (`#aoa_deg`, `#span_mm`, …, one per
+  B.4 editable param, at the top of the feature list; *not* configuration inputs), fixed
   mounts/endplates, fixed airfoil profile (imported points/spline; no airfoil parameterization).
   Build on a dev account; copy to prod at CP-D.
 - [ ] **A3 (by 19:30)** `apply_values` + `create_version` (B.6) with mocked tests, then live
@@ -225,7 +230,7 @@ and `run_complete` are reused unchanged. W-D adds the reducer cases.
 
 | Time | W-A | W-B | W-C | W-D |
 |---|---|---|---|---|
-| 14:45–16:00 | **A1 morph spike** | B1, start B2 | **C1 contracts** | D1 extension skeleton |
+| 14:45–16:00 | A1 done (W-C); start A2 wing Part Studio with Variable features | B1, start B2 | **C1 contracts** | D1 extension skeleton |
 | **16:00** | **CP-B** (15 min, all) | | | |
 | 16:00–18:00 | A2 wing Part Studio | B2 solver | C2 investigator | D2 panel on fixtures |
 | **18:00** | **CP-C**; dinner until 18:45 | | | |

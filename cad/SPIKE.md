@@ -95,3 +95,28 @@ The minimum remains **0 deg**. Darwin measures sweep from the spanwise axis, so
 0 deg is an unswept, right-angle fin. The earlier report that 0 did not
 regenerate came from the pre-fix complementary-angle sketch and is not a reason
 to narrow the design-space bound. See `cad/CONTRACT_REQUESTS.md`.
+
+## Morph spike (Plan v4 A1) — Sat Oct 24, 14:40–14:49. Verdict: **feature/variable updates morph live**
+
+Run by W-C on a disposable API copy of the fin document ("Darwin morph test
+(disposable)", prod account), with a teammate watching the copy open in a browser.
+20 ledgered calls in total. No IDs recorded here.
+
+| Method | Write latency | Document changed? | Open tab changed live? |
+|---|---|---|---|
+| (a) Configuration update (`update_configuration`: current values + defaults) | 0.2–1.0 s | **Yes**: read-back matches, microversion advances, default-config STL bbox 90×60 → 120×85 → 77×30 mm | **No.** On refresh the new default flashed, then the viewer's own selected configuration re-rendered the old shape. Configuration values are per-viewer session state |
+| (b) Feature update (`POST /partstudios/d/{did}/w/{wid}/e/{eid}/features/featureid/{fid}`, `BTFeatureDefinitionCall-1406`, body = fresh GET's feature with one parameter expression changed, plus `serializationVersion` and `sourceMicroversion`) | **0.47 s** | **Yes**: featureStatus OK, STL thickness 3 → 15 mm | **Yes, live, no refresh** |
+
+**Consequences:**
+- Darwin's per-step writes edit the **model** (Variable features), never configuration defaults.
+- **The rear-wing Part Studio must be driven by Variable features** (`#aoa_deg`, `#span_mm`, …) placed
+  at the top of the feature list, with dimensions referencing them. One feature-update POST per
+  changed variable (~0.5 s each); a step that changes 1–2 levers costs 1–2 calls.
+- The fin Part Studio is configuration-driven, so it can't morph live as built. Either add
+  Variable features to it, or show the fin beat from replay.
+- **Element IDs change when a document is copied.** Always look up the Part Studio element
+  per document (`GET /documents/d/{did}/w/{wid}/elements?elementType=PARTSTUDIO`).
+- Copying a document: `POST /documents/{did}/workspaces/{wid}/copy` with
+  `{"newName", "isPublic": false}`, 0.9 s, 1 call.
+- Configured export still works for read-only what-if geometry, and the default-config export
+  reflects feature edits.
