@@ -386,7 +386,7 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 
 ## Part C: The four sections
 
-**Progress (Sat 16:10):** done: A1, A3, B1, B2, B3, B4, C1, C2, C3; C4 (live-verified on Onshape, rules planner). The investigator runs end to end on the
+**Progress (Sat 16:30):** done: A1, A3, B1–B5, C1–C4, D1, D2. In progress: A2 (wing Part Studio, W-A's build guide is in `cad/WING_PARTSTUDIO.md`). The Anthropic API works again (16:28, Hannah's own $5). The investigator runs end to end on the
 real rear-wing solver (CP-C's terminal criterion is met). **Not yet visible in git:** anything from
 W-A (A2 wing Part Studio) or W-D (D1 extension). W-C did A3 (`cad/variables.py`).
 
@@ -547,10 +547,10 @@ The structural/FEA work is parked: leave the files, stop work.
 - slides, the video
 
 **Checklist:**
-- [ ] **D1 (by 17:00) `extension/`:** Chrome MV3, `sidePanel` permission, panel enabled only on
+- [x] **D1 (by 17:00) `extension/`:** ✅ *done 16:16 (W-D, `498ee89`); checked by W-C against every criterion from code and its 4 tests; not yet tried in a real Chrome window* Chrome MV3, `sidePanel` permission, panel enabled only on
   `cad.onshape.com` tabs (`sidePanel.setOptions` + `tabs.onUpdated`). It reads the active tab
   URL and loads `http://localhost:5173/panel?doc=<encoded url>` in an iframe. Load it unpacked.
-- [ ] **D2 (by 19:00) `/panel` route** (~400 px wide), built against `sample_investigation.jsonl`
+- [x] **D2 (by 19:00) `/panel` route** ✅ *done 16:16 (W-D, `4054b46`): all six panel elements present, tests pass; it doesn't render `design_applied` (morph) events yet, which belongs to D3* (~400 px wide), built against `sample_investigation.jsonl`
   on the mock server:
   1. prompt box + "will change / will keep" chips (`/api/inspect`)
   2. **step cards**: hypothesis, principle tag, prediction ranges → actual values, verdict
