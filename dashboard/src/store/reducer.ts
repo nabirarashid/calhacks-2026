@@ -264,6 +264,13 @@ export function reduceEvent(state: RunFoldState, event: AnyDarwinEvent): RunFold
       // contracts v1.1: FEA stage progress. W-D renders it in P3-D1; until then it is ignored.
       return next;
 
+    case 'step_planned':
+    case 'step_result':
+    case 'notebook_updated':
+    case 'design_applied':
+      // contracts v1.2: the investigation loop. W-D renders these in the /panel route (D2).
+      return next;
+
     default: {
       const exhaustive: never = event;
       return exhaustive;

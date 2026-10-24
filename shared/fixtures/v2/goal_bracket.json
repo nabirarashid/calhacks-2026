@@ -33,6 +33,7 @@
     }
   ],
   "fixed_params": {},
+  "editable": null,
   "context_overrides": {},
   "assumptions": [
     "20 N downward at the load hole; both mounting holes bolted (engineer-confirmed)."

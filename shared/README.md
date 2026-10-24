@@ -53,3 +53,19 @@ The mock server now serves every v2 route: `GET /api/projects`, `POST /api/proje
 `POST /api/discover` (alias for inspect). `POST /api/runs` with `project_id: "bracket..."`
 streams the structural sample. Inventories are synthetic until W-A swaps in sanitized captures
 (same file names and shape).
+
+## Contracts v1.2 (tag `contracts-v1.2`, CONTRACT_VERSION 1.2.0) — the investigation loop
+
+PLAN.md Part B.3–B.6 and B.10. Additive: every earlier model, fixture and recording still validates.
+
+| File | What |
+|---|---|
+| `contracts.py` | `Goal.editable` (params the user allowed to change; `None` = all not fixed) |
+| `investigation.py` / `investigation.ts` | `Hypothesis`, `Prediction`, `PredictionCheck`, `StepResult`, `Notebook`, `DesignApplied`, and `score_prediction()` (deterministic scoring) |
+| `events.py` | `step_planned`, `step_result`, `notebook_updated`, `design_applied` |
+| `mocks/fake_wing.py` | Closed-form rear wing with the `rear_wing_v1` names (lifting line, endplate AR, flap effectiveness, soft stall). Used by wiring only until W-B's solver registers |
+| `fixtures/v2/sample_investigation.jsonl` | A recorded 6-step session: angle rejected (drag +50%), span and endplates accepted, a small angle step accepted, the flap rejected twice then ruled out. Downforce +35% at 14.87 N (limit 15). Prediction accuracy 0.75 → 0.89 |
+| `fixtures/v2/manifest_wing.json`, `goal_wing.json` | The demo project and goal (same as `projects/rear_wing/r1.json`) |
+
+Mock server: `POST /api/inspect`, `POST /api/sessions` (streams the sample), `GET /api/sessions/{id}/notebook`,
+`POST /api/sessions/{id}/stop`. The finished sample is preloaded as run `session_fixture_wing`.

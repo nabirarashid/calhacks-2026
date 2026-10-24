@@ -371,6 +371,6 @@ are exactly what the rear-wing solver and the knowledge layer need.
 - Luminary Cloud × Onshape: luminary.ai/resources/luminary-cloud-launches-integration-with-onshape-by-ptc-to-accelerate-physics-ai-workflows/
 - Sharpe & Hansman, *NeuralFoil* (2025), arXiv:2503.16323
 - Liu et al., *Large Language Models to Enhance Bayesian Optimization* (LLAMBO, ICLR 2024), arXiv:2402.03921
-- Chrome Side Panel API: developer.chrome.com/docs/extensions/reference/api/sidePanel
+- Chrome Side Panel API: developer.chrome.com, Extensions reference, "chrome.sidePanel"
 - Onshape extensions (OAuth app → Extensions tab): cad.onshape.com/help/Content/Plans/my_account_developer.htm
 - FSAE aero device limits (2017 T7 text; check the current rulebook): formulastudent.de/uploads/media/Rules2017_T7_V1.01.pdf

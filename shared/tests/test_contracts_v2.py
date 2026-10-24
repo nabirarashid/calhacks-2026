@@ -72,7 +72,7 @@ def test_mock_server_onboarding_flow():
     fake_onboarding.reset()
     c = TestClient(app)
     ids = {p["project_id"]: p["maturity"] for p in c.get("/api/projects").json()}
-    assert ids == {"fin_reference": 3, "bracket": 3}
+    assert ids == {"fin_reference": 3, "bracket": 3, "rear_wing": 3}
 
     body = c.post("/api/projects/inspect", json={"doc_url": "https://example/bracket"}).json()
     pid, m = body["project_id"], ProjectManifest.model_validate(body["manifest"])

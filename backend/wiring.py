@@ -20,6 +20,8 @@ from backend.projects import ProjectRegistry
 
 log = logging.getLogger("darwin.wiring")
 ROOT = Path(__file__).resolve().parent.parent
+# Closed-form stand-ins used only while a real scorer is missing from sim (PLAN.md B.10).
+FALLBACK_SCORERS = {"rear_wing_v1": "shared.mocks.fake_wing"}
 FIXTURES = ROOT / "shared" / "fixtures"
 
 
@@ -98,6 +100,14 @@ class Wiring:
                 bind_pack(space.id, pack)
             except KeyError as e:
                 log.warning("project %s: %s", m.project_id, e)
+        if space.scorer in FALLBACK_SCORERS and self.modes.get("sim") == "real":
+            try:
+                self.sim.metric_catalog(space.scorer)
+            except KeyError:        # the real solver hasn't landed yet: use the closed-form stand-in
+                plugin = importlib.import_module(FALLBACK_SCORERS[space.scorer]).PLUGIN
+                self.sim.register_scorer(space.scorer, plugin)
+                self.modes[space.scorer] = "fake(fallback)"
+                log.warning("scorer %s not in sim; using %s", space.scorer, FALLBACK_SCORERS[space.scorer])
         if m.analysis and m.analysis.screening_adapter in adapters.SOLVERS and "optimize" in m.authority.permitted:
             if self.modes.get("sim") != "real":
                 log.warning("project %s needs DARWIN_SIM=real for its %s adapter", m.project_id,

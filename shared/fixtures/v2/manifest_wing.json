@@ -1,0 +1,200 @@
+{
+  "schema_version": "manifest-v1",
+  "project_id": "rear_wing",
+  "revision": 1,
+  "name": "FSAE rear wing",
+  "domain_pack": "aero",
+  "cad": {
+    "provider": "onshape",
+    "doc_ref": "DARWIN_DOC_WING",
+    "write_target_ref": "DARWIN_DOC_WING",
+    "source_microversion": null,
+    "export": "stl_configured"
+  },
+  "design_space": {
+    "id": "rear_wing_v1",
+    "name": "FSAE-style rear wing",
+    "scorer": "rear_wing_v1",
+    "parameters": [
+      {
+        "name": "aoa_deg",
+        "kind": "continuous",
+        "unit": "deg",
+        "min": 0.0,
+        "max": 16.0,
+        "step": 0.5,
+        "choices": null,
+        "default": 6.0,
+        "cad_driven": true,
+        "cad_ref": "aoa_deg",
+        "description": "Main element angle of attack"
+      },
+      {
+        "name": "span_mm",
+        "kind": "continuous",
+        "unit": "mm",
+        "min": 700.0,
+        "max": 1000.0,
+        "step": 5.0,
+        "choices": null,
+        "default": 850.0,
+        "cad_driven": true,
+        "cad_ref": "span_mm",
+        "description": "Wing span (rule width limit)"
+      },
+      {
+        "name": "chord_mm",
+        "kind": "continuous",
+        "unit": "mm",
+        "min": 200.0,
+        "max": 350.0,
+        "step": 5.0,
+        "choices": null,
+        "default": 280.0,
+        "cad_driven": true,
+        "cad_ref": "chord_mm",
+        "description": "Total chord, main element plus flap"
+      },
+      {
+        "name": "flap_angle_deg",
+        "kind": "continuous",
+        "unit": "deg",
+        "min": 0.0,
+        "max": 35.0,
+        "step": 0.5,
+        "choices": null,
+        "default": 15.0,
+        "cad_driven": true,
+        "cad_ref": "flap_angle_deg",
+        "description": "Flap deflection"
+      },
+      {
+        "name": "flap_chord_frac",
+        "kind": "continuous",
+        "unit": "",
+        "min": 0.2,
+        "max": 0.4,
+        "step": 0.01,
+        "choices": null,
+        "default": 0.3,
+        "cad_driven": true,
+        "cad_ref": "flap_chord_frac",
+        "description": "Flap chord as a fraction of total chord"
+      },
+      {
+        "name": "endplate_height_mm",
+        "kind": "continuous",
+        "unit": "mm",
+        "min": 100.0,
+        "max": 300.0,
+        "step": 5.0,
+        "choices": null,
+        "default": 200.0,
+        "cad_driven": true,
+        "cad_ref": "endplate_height_mm",
+        "description": "Endplate height"
+      }
+    ],
+    "context": {
+      "velocity_mps": 25.0,
+      "rho": 1.225
+    },
+    "source": {
+      "kind": "onshape",
+      "doc_url": null,
+      "mode": "configuration",
+      "model_revision": "r1"
+    },
+    "discovered": false,
+    "notes": [
+      "Ranges from PLAN.md B.5; W-B owns the real solver and may narrow them before CP-B."
+    ]
+  },
+  "semantics": [
+    {
+      "name": "aoa_deg",
+      "cad_ref": "aoa_deg",
+      "role": "editable",
+      "meaning": "Main element angle of attack",
+      "confidence": null,
+      "confirmed": true
+    },
+    {
+      "name": "span_mm",
+      "cad_ref": "span_mm",
+      "role": "editable",
+      "meaning": "Wing span (rule width limit)",
+      "confidence": null,
+      "confirmed": true
+    },
+    {
+      "name": "chord_mm",
+      "cad_ref": "chord_mm",
+      "role": "editable",
+      "meaning": "Total chord, main element plus flap",
+      "confidence": null,
+      "confirmed": true
+    },
+    {
+      "name": "flap_angle_deg",
+      "cad_ref": "flap_angle_deg",
+      "role": "editable",
+      "meaning": "Flap deflection",
+      "confidence": null,
+      "confirmed": true
+    },
+    {
+      "name": "flap_chord_frac",
+      "cad_ref": "flap_chord_frac",
+      "role": "editable",
+      "meaning": "Flap chord as a fraction of total chord",
+      "confidence": null,
+      "confirmed": true
+    },
+    {
+      "name": "endplate_height_mm",
+      "cad_ref": "endplate_height_mm",
+      "role": "editable",
+      "meaning": "Endplate height",
+      "confidence": null,
+      "confirmed": true
+    }
+  ],
+  "protected": [],
+  "material": null,
+  "load_cases": [],
+  "requirements": [],
+  "analysis": {
+    "screening_adapter": "rear_wing_v1",
+    "verify_adapter": "rear_wing_v1",
+    "verify_top_k": 0,
+    "convergence": "none",
+    "timeout_s": 60.0
+  },
+  "authority": {
+    "maturity": 3,
+    "permitted": [
+      "inspect",
+      "probe",
+      "simulate",
+      "optimize"
+    ],
+    "max_onshape_calls_per_run": 12,
+    "evidence": [
+      "solver: rear_wing_v1 (fake_wing until W-B's B2/B3 land)"
+    ]
+  },
+  "assumptions": [
+    "Airfoil (inverted NACA 4412 main and flap), flap gap, mounts and ride height are fixed.",
+    "25 m/s, sea-level air, no ground effect."
+  ],
+  "open_questions": [],
+  "history": [
+    {
+      "revision": 1,
+      "at": "2026-10-24T15:00:00-07:00",
+      "by": "W-C",
+      "change": "Rear-wing project created for Plan v4"
+    }
+  ]
+}

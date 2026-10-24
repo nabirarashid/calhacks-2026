@@ -25,6 +25,7 @@ from shared.manifest import (
     ProjectManifest, ProtectedInterface, Requirement, RevisionNote, SourceRef,
 )
 from shared.mocks import fake_structural as fs
+from shared.mocks import fake_wing as fw
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 OUT = FIXTURES / "v2"
@@ -69,6 +70,25 @@ def manifest_fin() -> ProjectManifest:
                      "Yield strength is not used by fin_v1; listed for completeness."],
         history=[RevisionNote(revision=1, at="2026-10-24T12:00:00-07:00", by="W-C",
                               change="Fin reference project created from contracts-v1 design_space_fin.json")],
+    )
+
+
+def manifest_wing() -> ProjectManifest:
+    """The demo hero (PLAN.md A.4/B.5). Variable features in Onshape carry the param names."""
+    space = fw.WING_SPACE
+    sem = [ParamSemantics(name=p.name, cad_ref=p.cad_ref or p.name, role="editable", meaning=p.description,
+                          confirmed=True) for p in space.parameters]
+    return ProjectManifest(
+        project_id="rear_wing", revision=1, name="FSAE rear wing", domain_pack="aero",
+        cad=CadBinding(provider="onshape", doc_ref="DARWIN_DOC_WING", write_target_ref="DARWIN_DOC_WING"),
+        design_space=space, semantics=sem,
+        analysis=AnalysisPlan(screening_adapter="rear_wing_v1", verify_adapter="rear_wing_v1", verify_top_k=0),
+        authority=Authority(maturity=3, permitted=PERMITTED_BY_LEVEL[3],  # type: ignore[arg-type]
+                            evidence=["solver: rear_wing_v1 (fake_wing until W-B's B2/B3 land)"]),
+        assumptions=["Airfoil (inverted NACA 4412 main and flap), flap gap, mounts and ride height are fixed.",
+                     "25 m/s, sea-level air, no ground effect."],
+        history=[RevisionNote(revision=1, at="2026-10-24T15:00:00-07:00", by="W-C",
+                              change="Rear-wing project created for Plan v4")],
     )
 
 
@@ -387,6 +407,188 @@ def sample_structural_run(m: ProjectManifest) -> List[dict]:
     return events, fail_id
 
 
+# ---------------------------------------------------------------- sample investigation (PLAN.md B.10)
+
+WING_GOAL = Goal(
+    source_text="More downforce without going over 15 N of drag at 25 m/s. You can change the angle, span, "
+                "flap and endplates. Keep the chord.",
+    objectives=[Objective(metric="downforce_n", direction="maximize", weight=1.0)],
+    constraints=[Constraint(ref="drag_n", op="<=", value=15.0, label="Drag <= 15 N"),
+                 Constraint(ref="stall_margin_deg", op=">=", value=2.0, label="Stall margin >= 2 deg")],
+    editable=["aoa_deg", "span_mm", "flap_angle_deg", "flap_chord_frac", "endplate_height_mm"],
+    assumptions=["Chord, airfoil, mounts and ride height stay fixed.", "Drag limit applies at 25 m/s."],
+    parsed_by="preset",
+)
+
+# (levers, candidate values for the single lever, principle ids, rationale, predictions[(metric, dir, lo, hi)])
+INVESTIGATION = [
+    ("aoa_deg", [10.0, 12.0], ["P-AOA-LIFT"],
+     "Downforce grows about linearly with angle and the wing has stall margin, so more angle is the most direct lever.",
+     [("downforce_n", "up", 20, 30), ("drag_n", "up", 15, 30)]),
+    ("span_mm", [950.0, 1000.0], ["P-INDUCED-AR"],
+     "Drag is mostly induced, so raising aspect ratio with span to the rule limit should add downforce cheaply.",
+     [("downforce_n", "up", 10, 20), ("drag_n", "up", 5, 15), ("l_over_d", "up", 3, 10)]),
+    ("endplate_height_mm", [250.0, 300.0], ["P-ENDPLATE-AR"],
+     "Taller endplates raise effective aspect ratio, cutting induced drag and freeing budget for downforce.",
+     [("downforce_n", "up", 2, 6), ("drag_n", "down", -5, -1)]),
+    ("aoa_deg", [7.0, 8.0], ["P-AOA-LIFT"],
+     "Span and endplates freed some drag budget; spend it on a small angle increase, staying clear of stall.",
+     [("downforce_n", "up", 5, 10), ("drag_n", "up", 8, 15)]),
+    ("flap_angle_deg", [20.0, 25.0], ["P-FLAP-CAMBER"],
+     "Flap camber might add downforce more efficiently than angle at this lift coefficient.",
+     [("downforce_n", "up", 8, 15), ("drag_n", "up", 5, 12)]),
+    ("flap_angle_deg", [17.0, 18.0], ["P-FLAP-CAMBER"],
+     "Try a much smaller flap step to see if any flap increase fits the remaining drag budget.",
+     [("downforce_n", "up", 3, 6), ("drag_n", "up", 6, 12)]),
+]
+
+EXPLAIN = {
+    1: ("Downforce rose 25.1% but drag rose 50.4% to 18.09 N, past the 15 N limit: induced drag grows with CL "
+        "squared, faster than lift.", "Drag is the binding constraint and it is mostly induced."),
+    2: ("Span 1000 mm added 22.2% downforce for 14.2% more drag; L/D improved 7.0% because effective aspect ratio "
+        "rose.", "Span buys downforce more cheaply than angle."),
+    3: ("Endplates at 300 mm cut drag 2.9% and added 4.0% downforce, as the higher effective aspect ratio "
+        "lowered induced drag.", "Taller endplates help on both downforce and drag."),
+    4: ("Angle 7 deg added 6.3% downforce with drag at 14.87 N, just inside the limit; 8 deg would exceed it.",
+        "The drag budget is nearly spent."),
+    5: ("Flap 20 deg added 11.3% downforce but drag rose 23.5%, more than predicted, to 18.37 N: the flap's "
+        "extra lift carries induced drag.", "Flap drag cost is higher than expected at this lift level."),
+    6: ("Even flap 17 deg pushed drag to 16.22 N, over the limit, for 4.5% more downforce.",
+        "No flap increase fits the drag budget; stop changing the flap."),
+}
+
+
+def _wing_stl(p: Dict[str, ParamValue]) -> str:
+    """A thin slab sized by span/chord and pitched by the angle of attack, for the 3D view."""
+    import math
+    b, c, a = float(p["span_mm"]), float(p["chord_mm"]), math.radians(float(p["aoa_deg"]))
+    t = 0.12 * c
+    pts = []
+    for (x, z) in ((0.0, 0.0), (c, 0.0), (c, t), (0.0, t)):
+        xr, zr = x * math.cos(a) + z * math.sin(a), -x * math.sin(a) + z * math.cos(a)
+        pts.append((xr, zr))
+    v = [(x, y, z) for y in (-b / 2, b / 2) for (x, z) in pts]
+    faces = [(0, 1, 2), (0, 2, 3), (4, 6, 5), (4, 7, 6), (0, 4, 5), (0, 5, 1), (1, 5, 6), (1, 6, 2),
+             (2, 6, 7), (2, 7, 3), (3, 7, 4), (3, 4, 0)]
+    lines = ["solid wing"]
+    for f in faces:
+        lines += ["  facet normal 0 0 0", "    outer loop"] + \
+                 ["      vertex %.3f %.3f %.3f" % v[i] for i in f] + ["    endloop", "  endfacet"]
+    return "\n".join(lines + ["endsolid wing", ""])
+
+
+def sample_investigation() -> Tuple[List[dict], Dict[str, float]]:
+    from shared.investigation import (Belief, DesignApplied, Hypothesis, Notebook, Prediction, StepResult,
+                                      score_prediction)
+    from shared.events import (AgentMessageEvent, BudgetUpdate, ChampionUpdated, DesignEvaluated, RunComplete,
+                               RunStarted, make_event)
+    from shared.mocks.fake_sim import aggregate
+    from shared.contracts import Score
+    space, run_id, t0 = fw.WING_SPACE, "session_fixture_wing", 1761343200.0
+    events, seq, ts = [], [0], [t0]
+
+    def emit(type_, payload, dt=0.6):
+        seq[0] += 1
+        ts[0] += dt
+        events.append(make_event(type_, run_id, seq[0], round(ts[0], 3), payload).model_dump(mode="json"))
+
+    sims = [0]
+
+    def design(step: int, idx: int, origin: str, params: Dict[str, ParamValue], op: str, why: str,
+               parents: List[str]) -> DesignResult:
+        p = canonicalize(space, params)
+        mets = fw.wing_metrics(p)
+        obj, viols, feasible, agg = aggregate(space, p, mets, WING_GOAL, fw.CATALOG)
+        sims[0] += 1
+        return DesignResult(design_id=make_design_id(run_id, step, origin, idx), run_id=run_id, generation=step,
+                            origin=origin, params=p, param_hash=param_hash(space, p), parent_ids=parents,  # type: ignore
+                            operator=op, rationale=why,
+                            score=Score(metrics=mets, objective_scores=obj, violations=viols, feasible=feasible,
+                                        aggregate=round(agg, 5), eval_ms=0.05),
+                            timings_ms={"eval": 0.05})
+
+    def applied(d: DesignResult, version: Optional[str] = None) -> DesignApplied:
+        key = geometry_key(space, d.params)
+        (GEOM / ("%s.stl" % key)).write_text(_wing_stl(d.params))
+        return DesignApplied(design_id=d.design_id, version=version, geometry=GeometryRef(
+            geometry_key=key, status="ready", source="mock", stl_url="/api/geometry/%s.stl" % key,
+            onshape_calls=1, regen_status="OK", elapsed_ms=470.0))
+
+    def budget() -> BudgetStatus:
+        return BudgetStatus(
+            onshape=OnshapeBudget(account_label="mock", calls_session=seq[0] // 8, calls_ledger_total=seq[0] // 8,
+                                  remaining_estimate=2400, reserve=400, reserve_unlocked=False, hard_stop=False),
+            model=ModelBudget(provider="mock", calls_run=2 * len(nb.accuracy), calls_cap_run=20, spend_run_usd=0.0,
+                              spend_cap_run_usd=0.6, spend_total_usd=0.0, spend_cap_total_usd=4.5),
+            evals_used=sims[0], evals_budget=20)
+
+    summary = RunSummary(run_id=run_id, status="running", goal=WING_GOAL, design_space_id=space.id,
+                         config=RunConfig(eval_budget=20, baselines=[]), started_at="2026-10-24T20:00:00-07:00")
+    emit("run_started", RunStarted(summary=summary, design_space=space, metric_catalog=fw.CATALOG))
+    nb = Notebook()
+    cur = design(0, 0, "seed", {q.name: q.default for q in space.parameters}, "seed", "Current design in Onshape", [])
+    emit("design_evaluated", DesignEvaluated(design=cur))
+    emit("design_applied", applied(cur, version="Before Darwin"))
+    seed, curve, scores = cur, [CurvePoint(evals=1, best_aggregate=cur.score.aggregate)], []
+    flap_rejections = 0
+    for step, (lever, values, pids, why, preds) in enumerate(INVESTIGATION, 1):
+        hyp = Hypothesis(step=step, levers=[lever], candidates=[dict(cur.params, **{lever: v}) for v in values],
+                         principle_ids=pids, rationale=why,
+                         predictions=[Prediction(metric=m, direction=d, pct_low=lo, pct_high=hi)
+                                      for m, d, lo, hi in preds])
+        emit("step_planned", hyp, dt=2.5)
+        tested = [design(step, i, "agent", c, "refine", why, [cur.design_id]) for i, c in enumerate(hyp.candidates)]
+        for d in tested:
+            emit("design_evaluated", DesignEvaluated(design=d), dt=0.3)
+        feasible = [d for d in tested if d.score.feasible and d.score.aggregate > cur.score.aggregate]
+        best = max(feasible, key=lambda d: d.score.aggregate) if feasible else \
+            min(tested, key=lambda d: sum(v.amount for v in d.score.violations if v.hard))
+        deltas = {m: round(100.0 * (best.score.metrics[m] - cur.score.metrics[m]) / abs(cur.score.metrics[m]), 3)
+                  for m in ("downforce_n", "drag_n", "l_over_d", "drag_induced_n", "drag_profile_n",
+                            "stall_margin_deg")}
+        checks = [score_prediction(pr, deltas[pr.metric]) for pr in hyp.predictions]
+        scores += [c.score for c in checks]
+        if feasible:
+            verdict = "accepted"
+        else:
+            flap_rejections += lever == "flap_angle_deg"
+            verdict = "pivot" if lever == "flap_angle_deg" and flap_rejections >= 2 else "rejected"
+        explanation, lesson = EXPLAIN[step]
+        step_size = float(best.params[lever]) - float(cur.params[lever])
+        if step_size:
+            nb.lever_effects.setdefault(lever, {}).update(
+                {m: round(deltas[m] / step_size, 4) for m in ("downforce_n", "drag_n")})
+        if verdict == "accepted":
+            emit("champion_updated", ChampionUpdated(design_id=best.design_id, previous_id=cur.design_id,
+                                                     aggregate=best.score.aggregate,
+                                                     delta=best.score.aggregate - cur.score.aggregate,
+                                                     reason="step %d accepted" % step))
+            emit("design_applied", applied(best), dt=0.5)
+            cur = best
+        emit("step_result", StepResult(step=step, tested=[d.design_id for d in tested], best_id=best.design_id,
+                                       deltas=deltas, checks=checks, verdict=verdict, explanation=explanation,
+                                       lesson=lesson), dt=2.0)
+        nb.beliefs.append(Belief(text=lesson, evidence_steps=[step], principle_id=pids[0] if pids else None))
+        if verdict == "pivot":
+            nb.ruled_out.append("Increasing %s under a 15 N drag limit (steps 5-6)" % lever)
+        nb.accuracy.append(round(sum(scores) / len(scores), 3))
+        emit("notebook_updated", nb.model_copy(deep=True), dt=0.4)
+        curve.append(CurvePoint(evals=sims[0], best_aggregate=cur.score.aggregate))
+        emit("budget_update", BudgetUpdate(budget=budget()), dt=0.2)
+    emit("agent_message", AgentMessageEvent(message=AgentMessage(
+        message_id="%s-final" % run_id, run_id=run_id, generation=len(INVESTIGATION), agent="system", kind="status",
+        model="rules", summary="Stopping: no remaining lever is predicted to add downforce within the drag limit.")))
+    gain = 100.0 * (cur.score.metrics["downforce_n"] - seed.score.metrics["downforce_n"]) / \
+        seed.score.metrics["downforce_n"]
+    emit("design_applied", applied(cur, version="Darwin: more downforce, +%.0f%%" % gain), dt=0.8)
+    final = summary.model_copy(update={"status": "complete", "finished_at": "2026-10-24T20:01:30-07:00",
+                                       "champion": cur, "seed_design": seed, "curves": {"agent": curve},
+                                       "budget": budget()})
+    emit("run_complete", RunComplete(summary=final))
+    return events, {"downforce_gain_pct": round(gain, 1), "final_drag_n": cur.score.metrics["drag_n"],
+                    "accuracy": nb.accuracy}
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     GEOM.mkdir(parents=True, exist_ok=True)
@@ -397,6 +599,7 @@ def main() -> None:
 
     bracket = manifest_bracket(3)
     dump("manifest_fin.json", manifest_fin())
+    dump("manifest_wing.json", manifest_wing())
     dump("manifest_bracket.json", bracket)
     dump("manifest_bracket_draft.json", manifest_bracket(1))
     dump("inventory_bracket.json", inventory_bracket())
@@ -414,6 +617,12 @@ def main() -> None:
     assert repaired and repaired[0]["score"]["feasible"], "scripted repair must pass"
     (OUT / "sample_structural_run.jsonl").write_text("".join(json.dumps(e, separators=(",", ":")) + "\n"
                                                              for e in events))
+    inv_events, inv = sample_investigation()
+    assert inv["final_drag_n"] <= 15.0 and inv["downforce_gain_pct"] > 0, inv
+    (OUT / "sample_investigation.jsonl").write_text("".join(json.dumps(e, separators=(",", ":")) + "\n"
+                                                            for e in inv_events))
+    dump("goal_wing.json", WING_GOAL)
+    print("sample investigation: %d events, %s" % (len(inv_events), inv))
     print("wrote %d v2 fixtures to %s (%d structural events; failure %s)"
           % (len(list(OUT.iterdir())), OUT, len(events), fail_id))
 

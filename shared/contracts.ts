@@ -1,7 +1,9 @@
 // Darwin shared contracts — FROZEN mirror of shared/contracts.py + shared/events.py (contracts-v1, v1.1 additions).
 // Contracts v2 project/onboarding types live in shared/manifest.ts.
 // Field names are snake_case exactly as on the wire. Python is the source of truth.
-export const CONTRACT_VERSION = '1.1.0';
+import type { DesignApplied, Hypothesis, Notebook, StepResult } from './investigation';
+
+export const CONTRACT_VERSION = '1.2.0';
 
 export type ParamValue = number | string;
 
@@ -73,6 +75,7 @@ export interface Goal {
   objectives: Objective[];
   constraints: Constraint[];
   fixed_params: Record<string, ParamValue>;
+  editable?: string[] | null;          // v1.2: params the user allowed to change; null = all not fixed
   context_overrides: Record<string, number | string>;
   assumptions: string[];
   parsed_by: 'llm' | 'preset' | 'manual' | 'fallback';
@@ -273,7 +276,8 @@ export interface RunSummary {
 export type EventType =
   | 'run_started' | 'design_evaluated' | 'generation_complete' | 'champion_updated'
   | 'geometry_ready' | 'agent_message' | 'baseline_progress' | 'landscape_ready'
-  | 'budget_update' | 'run_complete' | 'error' | 'analysis_progress';
+  | 'budget_update' | 'run_complete' | 'error' | 'analysis_progress'
+  | 'step_planned' | 'step_result' | 'notebook_updated' | 'design_applied';   // v1.2
 
 export interface RunStartedPayload { summary: RunSummary; design_space: DesignSpace; metric_catalog: MetricInfo[]; }
 export interface DesignEvaluatedPayload { design: DesignResult; }
@@ -324,6 +328,10 @@ export interface PayloadByType {
   run_complete: RunCompletePayload;
   error: ErrorPayload;
   analysis_progress: AnalysisProgressPayload;
+  step_planned: Hypothesis;            // v1.2 (shared/investigation.ts)
+  step_result: StepResult;
+  notebook_updated: Notebook;
+  design_applied: DesignApplied;
 }
 
 export interface DarwinEvent<T extends EventType = EventType> {

@@ -33,6 +33,8 @@ PRESETS = json.loads((FIXTURES / "presets.json").read_text())
 GOAL_EXAMPLE = json.loads((FIXTURES / "goal_example.json").read_text())
 STRUCTURAL = [json.loads(line) for line in (FIXTURES / "v2" / "sample_structural_run.jsonl").read_text().splitlines()
               if line.strip()]
+INVESTIGATION = [json.loads(line) for line in (FIXTURES / "v2" / "sample_investigation.jsonl").read_text().splitlines()
+                 if line.strip()]
 
 
 class Run:
@@ -97,7 +99,7 @@ def _start(prefix: str, goal: Optional[Dict[str, Any]], speed: float,
 
 
 def _preload_sample() -> None:
-    for template in (STRUCTURAL, TEMPLATE):    # the fin sample stays first in GET /api/runs
+    for template in (STRUCTURAL, INVESTIGATION, TEMPLATE):    # the fin sample stays first in GET /api/runs
         run = Run(template[0]["run_id"])
         run.events = list(template)
         run.status = "complete"
@@ -253,6 +255,50 @@ def budget() -> Dict[str, Any]:
             if ev["type"] == "budget_update":
                 return ev["payload"]["budget"]
     return json.loads((FIXTURES / "budget_example.json").read_text())
+
+
+# ---------------------------------------------------------------- v1.2: sessions (PLAN.md B.6)
+
+def _session_project(doc_url: str) -> str:
+    return "fin_reference" if "fin" in doc_url.lower() else "rear_wing"
+
+
+@app.post("/api/inspect")
+def inspect_doc(body: Dict[str, Any]) -> Dict[str, Any]:
+    pid = _session_project(str(body.get("doc_url", "")))
+    space = fake_onboarding.get(pid).design_space if fake_onboarding.get(pid) else None
+    if space is None:
+        raise HTTPException(404, "Darwin supports the rear wing and fin projects")
+    return {"project_id": pid, "fixed": [],
+            "params": [{"name": q.name, "unit": q.unit, "value": q.default, "min": q.min, "max": q.max}
+                       for q in space.parameters]}
+
+
+@app.post("/api/sessions")
+async def start_session(body: Dict[str, Any], speed: Optional[float] = None) -> Dict[str, Any]:
+    """Streams the recorded sample investigation, whatever the prompt (it's a mock)."""
+    goal = INVESTIGATION[0]["payload"]["summary"]["goal"]
+    run = _start("session", None, speed or float(os.environ.get("MOCK_SPEED", "1.0")), INVESTIGATION)
+    params = [q["name"] for q in INVESTIGATION[0]["payload"]["design_space"]["parameters"]]
+    editable = goal.get("editable") or params
+    return {"run_id": run.run_id, "project_id": "rear_wing", "goal": goal, "editable": editable,
+            "fixed": [p for p in params if p not in editable]}
+
+
+@app.get("/api/sessions/{run_id}/notebook")
+def session_notebook(run_id: str) -> Dict[str, Any]:
+    run = RUNS.get(run_id)
+    if run is None:
+        raise HTTPException(404, "unknown session")
+    for ev in reversed(run.events):
+        if ev["type"] == "notebook_updated":
+            return ev["payload"]
+    return {"beliefs": [], "lever_effects": {}, "ruled_out": [], "accuracy": []}
+
+
+@app.post("/api/sessions/{run_id}/stop")
+def stop_session(run_id: str) -> Dict[str, Any]:
+    return stop_run(run_id)
 
 
 # ---------------------------------------------------------------- contracts v2: projects (PLAN.md v3 B.7)

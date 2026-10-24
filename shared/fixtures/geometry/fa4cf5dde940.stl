@@ -1,0 +1,86 @@
+solid wing
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 -500.000 0.000
+      vertex 277.913 -500.000 -34.123
+      vertex 282.008 -500.000 -0.774
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 -500.000 0.000
+      vertex 282.008 -500.000 -0.774
+      vertex 4.095 -500.000 33.350
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 500.000 0.000
+      vertex 282.008 500.000 -0.774
+      vertex 277.913 500.000 -34.123
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 500.000 0.000
+      vertex 4.095 500.000 33.350
+      vertex 282.008 500.000 -0.774
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 -500.000 0.000
+      vertex 0.000 500.000 0.000
+      vertex 277.913 500.000 -34.123
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 0.000 -500.000 0.000
+      vertex 277.913 500.000 -34.123
+      vertex 277.913 -500.000 -34.123
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 277.913 -500.000 -34.123
+      vertex 277.913 500.000 -34.123
+      vertex 282.008 500.000 -0.774
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 277.913 -500.000 -34.123
+      vertex 282.008 500.000 -0.774
+      vertex 282.008 -500.000 -0.774
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 282.008 -500.000 -0.774
+      vertex 282.008 500.000 -0.774
+      vertex 4.095 500.000 33.350
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 282.008 -500.000 -0.774
+      vertex 4.095 500.000 33.350
+      vertex 4.095 -500.000 33.350
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 4.095 -500.000 33.350
+      vertex 4.095 500.000 33.350
+      vertex 0.000 500.000 0.000
+    endloop
+  endfacet
+  facet normal 0 0 0
+    outer loop
+      vertex 4.095 -500.000 33.350
+      vertex 0.000 500.000 0.000
+      vertex 0.000 -500.000 0.000
+    endloop
+  endfacet
+endsolid wing

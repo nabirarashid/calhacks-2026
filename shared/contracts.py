@@ -11,7 +11,7 @@ from typing import Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
-CONTRACT_VERSION = "1.1.0"   # 1.1.0 (contracts-v2): AnalysisArtifact, DesignResult.analysis; see shared/manifest.py
+CONTRACT_VERSION = "1.2.0"   # 1.2.0: Goal.editable, investigation events (shared/investigation.py); 1.1.0: AnalysisArtifact
 
 ParamValue = Union[float, int, str]
 
@@ -94,6 +94,7 @@ class Goal(BaseModel):
     objectives: List[Objective]
     constraints: List[Constraint] = Field(default_factory=list)
     fixed_params: Dict[str, ParamValue] = Field(default_factory=dict)
+    editable: Optional[List[str]] = None       # v1.2: params the user allowed to change; None = all not fixed
     context_overrides: Dict[str, Union[float, str]] = Field(default_factory=dict)
     assumptions: List[str] = Field(default_factory=list)   # shown to the user to confirm
     parsed_by: Literal["llm", "preset", "manual", "fallback"] = "llm"

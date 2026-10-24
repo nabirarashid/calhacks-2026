@@ -1,0 +1,42 @@
+{
+  "source_text": "More downforce without going over 15 N of drag at 25 m/s. You can change the angle, span, flap and endplates. Keep the chord.",
+  "objectives": [
+    {
+      "metric": "downforce_n",
+      "direction": "maximize",
+      "target": null,
+      "tolerance": null,
+      "weight": 1.0
+    }
+  ],
+  "constraints": [
+    {
+      "ref": "drag_n",
+      "op": "<=",
+      "value": 15.0,
+      "hard": true,
+      "label": "Drag <= 15 N"
+    },
+    {
+      "ref": "stall_margin_deg",
+      "op": ">=",
+      "value": 2.0,
+      "hard": true,
+      "label": "Stall margin >= 2 deg"
+    }
+  ],
+  "fixed_params": {},
+  "editable": [
+    "aoa_deg",
+    "span_mm",
+    "flap_angle_deg",
+    "flap_chord_frac",
+    "endplate_height_mm"
+  ],
+  "context_overrides": {},
+  "assumptions": [
+    "Chord, airfoil, mounts and ride height stay fixed.",
+    "Drag limit applies at 25 m/s."
+  ],
+  "parsed_by": "preset"
+}

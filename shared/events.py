@@ -13,10 +13,12 @@ from shared.contracts import (
     AgentMessage, BudgetStatus, CurvePoint, DesignResult, DesignSpace, Generation,
     GeometryRef, MetricInfo, RunSummary,
 )
+from shared.investigation import DesignApplied, Hypothesis, Notebook, StepResult
 
 EventType = Literal["run_started", "design_evaluated", "generation_complete", "champion_updated",
                     "geometry_ready", "agent_message", "baseline_progress", "landscape_ready",
-                    "budget_update", "run_complete", "error", "analysis_progress"]
+                    "budget_update", "run_complete", "error", "analysis_progress",
+                    "step_planned", "step_result", "notebook_updated", "design_applied"]   # v1.2
 
 
 class Event(BaseModel):
@@ -111,6 +113,11 @@ PAYLOADS = {
     "run_complete": RunComplete,
     "error": ErrorEvent,
     "analysis_progress": AnalysisProgress,
+    # v1.2: the hypothesis-driven loop (shared/investigation.py)
+    "step_planned": Hypothesis,
+    "step_result": StepResult,
+    "notebook_updated": Notebook,
+    "design_applied": DesignApplied,
 }  # type: Dict[str, Type[BaseModel]]
 
 

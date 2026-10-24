@@ -24,7 +24,7 @@ INVENTORIES = {}  # type: Dict[str, CadInventory]
 def reset() -> None:
     PROJECTS.clear()
     INVENTORIES.clear()
-    for m in (fx.manifest_fin(), fx.manifest_bracket(3)):
+    for m in (fx.manifest_fin(), fx.manifest_bracket(3), fx.manifest_wing()):
         PROJECTS[m.project_id] = m
 
 

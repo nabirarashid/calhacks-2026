@@ -30,10 +30,11 @@ def _full(m):
                               baseline_reproduced=True, golden_tests=["sim/tests/test_structural_golden.py"])
 
 
-def test_committed_fin_project_loads_at_level_3(reg):
-    assert reg.ids() == ["fin_reference"]
-    s = reg.summaries()[0]
-    assert (s.maturity, s.domain_pack, s.revision) == (3, "rocket_fin", 1)
+def test_committed_projects_load_at_level_3(reg):
+    assert reg.ids() == ["fin_reference", "rear_wing"]
+    by_id = {s.project_id: s for s in reg.summaries()}
+    assert (by_id["fin_reference"].maturity, by_id["fin_reference"].domain_pack) == (3, "rocket_fin")
+    assert (by_id["rear_wing"].maturity, by_id["rear_wing"].domain_pack) == (3, "aero")
 
 
 def test_rules_climb_one_level_at_a_time():
