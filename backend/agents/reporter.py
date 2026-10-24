@@ -26,7 +26,7 @@ def report(history: RunHistory, hifi: Optional[Score], baselines: Dict[str, Desi
     fallback = {"headline": "Champion %s found in %d evaluations." % (champ.design_id if champ else "-", len(history.designs)),
                 "narrative": critic_why, "caveats": ["Fast semi-empirical physics; verify before flight."]}
     try:
-        res = llm.call_model("reporter", system_prompt("reporter"), user_message("Write the report summary.", block),
+        res = llm.call_model("reporter", system_prompt("reporter", history.space), user_message("Write the report summary.", block),
                              report_schema(), model=llm.deep_model() if llm.provider_name() == "anthropic" else None,
                              max_tokens=2500, effort="medium", budget=budget, validate=lambda d: d["narrative"])
     except (llm.LLMUnavailable, llm.BudgetExceeded):

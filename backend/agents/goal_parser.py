@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from shared.contracts import Constraint, DesignSpace, Goal, MetricInfo, ModelResult, Objective, Preset
 
 from backend import llm
-from backend.agents.base import compact_specs, system_prompt, user_message
+from backend.agents.base import _packs, compact_specs, system_prompt, user_message
 from backend.agents.schemas import goal_schema
 
 
@@ -18,36 +18,6 @@ def _cast(space: DesignSpace, name: str, value: str) -> Any:
     if value not in (p.choices or []):
         raise ValueError("invalid choice %r for %s" % (value, name))
     return value
-
-
-_TUBE = re.compile(r"(\d+(?:\.\d+)?)\s*(?:-|\s)?\s*(inch|in\b|\"|mm)\s*(?:diameter\s*)?(?:body\s*)?tube", re.I)
-
-
-def body_tube_rule(text: str, space: DesignSpace, constraints: List[Constraint], overrides: Dict[str, Any],
-                   assumptions: List[str]) -> List[Constraint]:
-    """Deterministic reading of "fits a N-inch body tube" (units are code's job, not the model's).
-
-    The tube is the rocket body the fins mount on, so it sets body_diameter_mm and means the fins
-    must not hang past the aft end (aft_overhang_mm <= 0). It never limits a fin dimension: param
-    constraints equal to the tube's diameter or radius are misreadings and are dropped.
-    Moves to the rocket_fin domain pack in P1-5.
-    """
-    m = _TUBE.search(text)
-    if not m or "body_diameter_mm" not in space.context:
-        return constraints
-    d = float(m.group(1)) * (1.0 if m.group(2).lower() == "mm" else 25.4)
-    if not 30.0 <= d <= 200.0:
-        return constraints
-    kept = [c for c in constraints if not (c.ref.startswith("param:") and any(
-        abs(c.value - x) <= 0.01 * x for x in (d, d / 2.0)))]
-    if abs(d - float(space.context["body_diameter_mm"])) > 0.05:
-        overrides["body_diameter_mm"] = round(d, 2)
-    if not any(c.ref == "aft_overhang_mm" for c in kept):
-        kept.append(Constraint(ref="aft_overhang_mm", op="<=", value=0.0, hard=True,
-                               label="Fins must not overhang the aft end"))
-    assumptions.append("Read '%s' as the rocket body: %.1f mm diameter, fins may not overhang the aft end."
-                       % (m.group(0).strip(), d))
-    return kept
 
 
 def to_goal(data: Dict[str, Any], text: str, space: DesignSpace, catalog: List[MetricInfo]) -> Goal:
@@ -87,14 +57,27 @@ def to_goal(data: Dict[str, Any], text: str, space: DesignSpace, catalog: List[M
             raise ValueError("design_velocity_mps %.0f is outside the subsonic model's range (10-400 m/s)" % v)
         overrides["design_velocity_mps"] = v
     assumptions = [str(a) for a in data.get("assumptions", [])][:6]
-    if "aft_overhang_mm" in info:
-        constraints = body_tube_rule(text, space, constraints, overrides, assumptions)
+    rules = getattr(_packs.get(space.id), "goal_rules", None)
+    if rules is not None:      # deterministic domain rules (e.g. rocket_fin's body-tube reading)
+        constraints = rules(text, space, constraints, overrides, assumptions)
     return Goal(source_text=text, objectives=objectives, constraints=constraints, fixed_params=fixed,
                 context_overrides=overrides, assumptions=assumptions, parsed_by="llm")
 
 
-def fallback_goal(text: str, presets: List[Preset], reason: str) -> Goal:
-    """Nearest preset by word overlap, keeping the user's text."""
+def compatible_presets(presets: List[Preset], catalog: List[MetricInfo]) -> List[Preset]:
+    """Presets whose every objective and metric constraint exists in this project's catalog."""
+    names = {m.name for m in catalog}
+    return [p for p in presets if all(o.metric in names for o in p.goal.objectives)
+            and all(c.ref in names for c in p.goal.constraints if not c.ref.startswith("param:"))]
+
+
+def fallback_goal(text: str, presets: List[Preset], reason: str,
+                  catalog: Optional[List[MetricInfo]] = None) -> Goal:
+    """Nearest compatible preset by word overlap, keeping the user's text."""
+    if catalog is not None:
+        presets = compatible_presets(presets, catalog)
+    if not presets:
+        raise llm.LLMUnavailable("goal parser unavailable (%s) and no preset fits this project" % reason)
     words = set(re.findall(r"[a-z]+", text.lower()))
     best = max(presets, key=lambda p: len(words & set(re.findall(r"[a-z]+", p.text.lower()))))
     g = best.goal.model_copy(deep=True)
@@ -102,26 +85,29 @@ def fallback_goal(text: str, presets: List[Preset], reason: str) -> Goal:
     g.parsed_by = "fallback"
     g.assumptions = ["Goal parser unavailable (%s); used preset '%s'. Edit before running." % (reason, best.label)]
     m = re.search(r"(\d+(?:\.\d+)?)\s*g(?:rams?)?\b", text.lower())
+    grams = {c.name: c for c in catalog or [] if c.unit == "g"}
     for c in g.constraints:
-        if m and c.ref == "fin_mass_total_g":
+        if m and c.op == "<=" and (c.ref in grams or (catalog is None and c.ref.endswith("_g"))):
             c.value = float(m.group(1))
-            c.label = "total fin mass <= %s g" % m.group(1)
+            label = grams[c.ref].description.lower() if c.ref in grams else c.ref
+            c.label = "%s <= %s g" % (label, m.group(1))
     return g
 
 
 def parse_goal(text: str, space: DesignSpace, catalog: List[MetricInfo], presets: List[Preset],
                budget: Optional[llm.RunLLMBudget] = None) -> Tuple[Goal, Optional[ModelResult]]:
+    keys = getattr(_packs.get(space.id), "goal_context_keys", None)     # None = the whole context
     block = {"text": text,
              "metrics": [{"name": m.name, "unit": m.unit, "better": m.better, "description": m.description}
                          for m in catalog],
              "params": compact_specs(space),
              "context": {k: v for k, v in space.context.items()
-                         if k in ("body_diameter_mm", "design_velocity_mps", "mass_without_fins_g")}}
+                         if keys is None or k in keys}}
     try:
-        res = llm.call_model("goal_parser", system_prompt("goal_parser"),
+        res = llm.call_model("goal_parser", system_prompt("goal_parser", space),
                              user_message("Parse this goal.", block), goal_schema(space, catalog),
                              max_tokens=2000, effort="low", budget=budget, think=False,
                              validate=lambda d: to_goal(d, text, space, catalog))
     except (llm.LLMUnavailable, llm.BudgetExceeded) as e:
-        return fallback_goal(text, presets, str(e)), None
+        return fallback_goal(text, presets, str(e), catalog), None
     return to_goal(res.data, text, space, catalog), res

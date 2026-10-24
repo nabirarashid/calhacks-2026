@@ -60,13 +60,15 @@ def goal_schema(space: DesignSpace, catalog: List[MetricInfo]) -> Dict[str, Any]
     })
     fixed = _obj({"name": {"type": "string", "enum": [p.name for p in space.parameters]},
                   "value": {"type": "string"}})
-    return _obj({
+    props = {
         "objectives": {"type": "array", "items": objective},
         "constraints": {"type": "array", "items": constraint},
         "fixed_params": {"type": "array", "items": fixed},
-        "design_velocity_mps": NULLABLE_NUMBER,
         "assumptions": _str_list(),
-    })
+    }
+    if "design_velocity_mps" in space.context:     # only domains that have a design velocity
+        props["design_velocity_mps"] = NULLABLE_NUMBER
+    return _obj(props)
 
 
 def critic_schema(space: DesignSpace, catalog: List[MetricInfo]) -> Dict[str, Any]:

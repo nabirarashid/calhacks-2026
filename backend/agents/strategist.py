@@ -37,7 +37,7 @@ def strategize(history: RunHistory, population: int, budget: Optional[llm.RunLLM
         "previous_directive": history.directive.model_dump(mode="json"),
     }  # type: Dict[str, Any]
     try:
-        res = llm.call_model("strategist", system_prompt("strategist"),
+        res = llm.call_model("strategist", system_prompt("strategist", history.space),
                              user_message("Choose the search mode for the next generation.", block),
                              strategist_schema(history.space), max_tokens=1500, effort="low", budget=budget, think=False,
                              validate=lambda d: Directive(source="llm", **d))

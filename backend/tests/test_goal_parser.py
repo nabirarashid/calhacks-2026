@@ -3,11 +3,15 @@ from pathlib import Path
 
 from shared.contracts import DesignSpace, MetricInfo
 
+from domains import get_pack
+
+from backend.agents.base import bind_pack
 from backend.agents.goal_parser import to_goal
 
 FIX = Path(__file__).resolve().parent.parent.parent / "shared" / "fixtures"
 SPACE = DesignSpace.model_validate_json((FIX / "design_space_fin.json").read_text())
 CATALOG = [MetricInfo.model_validate(m) for m in json.loads((FIX / "metric_catalog_fin.json").read_text())]
+bind_pack(SPACE.id, get_pack("rocket_fin"))     # the body-tube rule is a rocket_fin domain rule
 PITCH = "Maximize this rocket fin's stability, keep drag low, keep it under 40 g, must fit a 3-inch body tube."
 
 

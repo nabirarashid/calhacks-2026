@@ -11,10 +11,41 @@ PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
 _cache = {}  # type: Dict[str, str]
 
 
-def system_prompt(role: str) -> str:
-    if role not in _cache:
-        _cache[role] = (PROMPTS / ("%s.md" % role)).read_text()
-    return _cache[role]
+_packs = {}  # type: Dict[str, Any]
+
+
+def bind_pack(space_id: str, pack: Any) -> None:
+    """Wiring binds each design space to its domain pack; prompts then carry the pack's wording."""
+    _packs[space_id] = pack
+    for key in [k for k in _cache if k.endswith("|" + space_id)]:
+        del _cache[key]
+
+
+def _sections(fragment: str) -> Dict[str, str]:
+    out, name = {}, None  # type: Dict[str, str], Optional[str]
+    for line in fragment.splitlines():
+        if line.startswith("## "):
+            name = line[3:].strip()
+            out[name] = ""
+        elif name is not None:
+            out[name] += line + "\n"
+    return {k: v.strip() for k, v in out.items() if v.strip()}
+
+
+def system_prompt(role: str, space: Optional[DesignSpace] = None) -> str:
+    """Generic role prompt, plus the bound domain pack's "all" and per-role sections."""
+    key = "%s|%s" % (role, space.id if space is not None else "")
+    if key not in _cache:
+        text = (PROMPTS / ("%s.md" % role)).read_text().rstrip()
+        pack = _packs.get(space.id) if space is not None else None
+        if pack is not None:
+            sec = _sections(pack.prompt_fragment)
+            if sec.get("all"):
+                text += "\n\nThe part:\n" + sec["all"]
+            if sec.get(role):
+                text += "\n\nDomain rules:\n" + sec[role]
+        _cache[key] = text + "\n"
+    return _cache[key]
 
 
 def user_message(instruction: str, block: Dict[str, Any]) -> str:

@@ -135,7 +135,7 @@ def _set_path(data: Dict[str, Any], path: str, value: Any) -> str:
 class ProjectRegistry:
     def __init__(self, root: Optional[Path] = None, runtime: Optional[Path] = None,
                  env: Optional[Callable[[], Dict[str, str]]] = None) -> None:
-        self.root = root or (ROOT / "projects")
+        self.root = root or Path(os.environ.get("DARWIN_PROJECTS_DIR") or (ROOT / "projects"))
         self.runtime = runtime or (Path(os.environ.get("DARWIN_CACHE_DIR", ".darwin")) / "projects")
         self._env = env or (lambda: dict(os.environ))
         self._lock = threading.Lock()

@@ -39,7 +39,7 @@ def propose(history: RunHistory, n: int, directive: Directive, sens: Dict[str, D
             budget: Optional[llm.RunLLMBudget] = None) -> Tuple[List[Proposal], str, ModelResult]:
     """Raises llm.LLMUnavailable / llm.BudgetExceeded; the run loop falls back to the GA."""
     block = build_block(history, n, directive, sens)
-    res = llm.call_model("proposer", system_prompt("proposer"),
+    res = llm.call_model("proposer", system_prompt("proposer", history.space),
                          user_message("Propose %d new designs for generation %d." % (n, history.generation), block),
                          proposer_schema(history.space), max_tokens=3000, effort="low", budget=budget, think=False,
                          validate=_validate)

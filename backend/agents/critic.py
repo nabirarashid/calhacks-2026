@@ -58,7 +58,7 @@ def critique(history: RunHistory, catalog: List[MetricInfo], sens: Dict[str, Dic
     """Returns (critique, model_result_or_None, scrubbed_numbers). Never raises."""
     block = build_block(history, sens)
     try:
-        res = llm.call_model("critic", system_prompt("critic"),
+        res = llm.call_model("critic", system_prompt("critic", history.space),
                              user_message("Explain generation %d." % history.generation, block),
                              critic_schema(history.space, catalog), model=model, max_tokens=2000, effort="low",
                              budget=budget, validate=lambda d: d["why_winner_won"])

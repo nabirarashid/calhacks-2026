@@ -398,7 +398,9 @@ class RunController:
     def _landscape(self) -> None:
         try:
             metrics = [o.metric for o in self.goal.objectives][:2]
-            for extra in ("drag_n", "stability_margin_cal"):
+            # Fill to two axes from the domain pack's headline metrics, then the catalog.
+            pack = getattr(self.w, "packs", {}).get(getattr(self.w, "space_project", {}).get(self.space.id, ""))
+            for extra in list(getattr(pack, "headline_metrics", [])) + [m.name for m in self.catalog]:
                 if len(metrics) < 2 and extra not in metrics:
                     metrics.append(extra)
             n = 2000 if self.config.profile == "full" else 1200

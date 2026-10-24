@@ -128,7 +128,7 @@ def test_commit_requires_approved_completed_champion(monkeypatch):
 
     approval = {"record": None}
 
-    def load_approval(run_id, approved_design):
+    def load_approval(run_id, approved_design, binding=None):
         approval_calls.append((run_id, approved_design))
         record = approval["record"]
         if record is None or (record.get("design_id"), record.get("param_hash")) != (
@@ -154,6 +154,16 @@ def test_commit_requires_approved_completed_champion(monkeypatch):
     assert cad_calls == [] and approval_calls[-1] == ("run_1", champion)
 
     approval["record"] = {"design_id": champion["design_id"], "param_hash": champion["param_hash"]}
+
+    # Approved, but the fin project is level 3: writes need level 4 (P0-2 live write recorded).
+    blocked = client.post(route, json={"design_id": champion["design_id"]})
+    assert blocked.status_code == 409 and "level 3" in blocked.json()["detail"]
+    assert cad_calls == []
+
+    fin = server.W.projects.get("fin_reference")
+    level4 = fin.model_copy(update={"authority": fin.authority.model_copy(update={
+        "maturity": 4, "permitted": ["inspect", "probe", "simulate", "optimize", "write"]})})
+    monkeypatch.setitem(server.W.projects._projects, "fin_reference", level4)
     response = client.post(route, json={"design_id": champion["design_id"]})
     assert response.status_code == 200 and response.json()["geometry_key"] == "committed"
     assert len(cad_calls) == 1 and cad_calls[0][1] == champion["params"]

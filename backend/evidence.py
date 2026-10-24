@@ -4,6 +4,7 @@ All numeric claims in this module are derived from the frozen run summary.  LLM
 prose may be displayed elsewhere, but it never supplies a requirement result or
 approval field here.
 """
+import hashlib
 import html
 import json
 import math
@@ -86,7 +87,28 @@ def metric_diff(seed: Optional[Dict[str, Any]], design: Dict[str, Any]) -> List[
     return rows
 
 
-def load_approval(run_id: str, design: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+BINDING_KEYS = ("project_id", "manifest_revision", "manifest_hash", "cad_source_microversion", "solver")
+
+
+def binding_for(manifest: Any) -> Dict[str, Any]:
+    """The exact project state an approval binds to (PLAN.md v3 B.8). Any change expires it."""
+    from shared.manifest import manifest_hash
+    a = manifest.analysis
+    solver = [{"adapter_id": x, "version": ""} for x in ([a.screening_adapter, a.verify_adapter] if a else [])
+              if x]
+    return {"project_id": manifest.project_id, "manifest_revision": manifest.revision,
+            "manifest_hash": manifest_hash(manifest), "cad_source_microversion": manifest.cad.source_microversion,
+            "solver": solver}
+
+
+def evidence_hash(evidence: Dict[str, Any]) -> str:
+    body = {k: v for k, v in evidence.items() if k != "approval"}
+    return hashlib.sha1(json.dumps(body, sort_keys=True, separators=(",", ":"), default=str)
+                        .encode("utf-8")).hexdigest()[:12]
+
+
+def load_approval(run_id: str, design: Optional[Dict[str, Any]] = None,
+                  binding: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
     path = _approval_path(run_id)
     try:
         record = json.loads(path.read_text())
@@ -97,11 +119,13 @@ def load_approval(run_id: str, design: Optional[Dict[str, Any]] = None) -> Optio
     if design is not None and (record.get("design_id") != design.get("design_id") or
                                record.get("param_hash") != design.get("param_hash")):
         return None
+    if binding is not None and any(record.get("binding", {}).get(k) != binding.get(k) for k in BINDING_KEYS):
+        return None      # the manifest, CAD revision or solver changed since approval
     return record
 
 
-def approve(run_id: str, summary: Dict[str, Any], design: Dict[str, Any], approved_by: str = "engineer") \
-        -> Dict[str, Any]:
+def approve(run_id: str, summary: Dict[str, Any], design: Dict[str, Any], approved_by: str = "engineer",
+            binding: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     requirements = requirement_results(summary.get("goal", {}), design)
     if not design.get("score", {}).get("feasible") or any(r["hard"] and not r["passed"] for r in requirements):
         raise ValueError("only a design satisfying every hard requirement can be approved")
@@ -122,6 +146,9 @@ def approve(run_id: str, summary: Dict[str, Any], design: Dict[str, Any], approv
         "geometry": geometry,
         "hifi_check": summary.get("hifi_check"),
     }
+    if binding is not None:
+        record["binding"] = binding
+        record["evidence_hash"] = evidence_hash(build_evidence(run_id, summary, design))
     path = _approval_path(run_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
@@ -130,7 +157,13 @@ def approve(run_id: str, summary: Dict[str, Any], design: Dict[str, Any], approv
     return record
 
 
-def build_evidence(run_id: str, summary: Dict[str, Any], design: Dict[str, Any]) -> Dict[str, Any]:
+GENERIC_LIMITATION = "This is optimization and simulation evidence, not safety certification."
+
+
+def build_evidence(run_id: str, summary: Dict[str, Any], design: Dict[str, Any], project: Any = None,
+                   pack: Any = None) -> Dict[str, Any]:
+    score = design.get("score", {})
+    analysis = design.get("analysis")
     return {
         "run_id": run_id,
         "status": summary.get("status"),
@@ -146,12 +179,15 @@ def build_evidence(run_id: str, summary: Dict[str, Any], design: Dict[str, Any])
         "hifi_check": summary.get("hifi_check"),
         "budget": summary.get("budget"),
         "degradations": summary.get("degradations", []),
-        "approval": load_approval(run_id, design),
-        "limitations": [
-            "This is optimization and simulation evidence, not flight-safety certification.",
-            "The fin model assumes subsonic, low-incidence flow and a fixed reference rocket.",
-            "The flutter result is a screening estimate and the material model assumes isotropic solid PLA.",
-        ],
+        "approval": load_approval(run_id, design, binding_for(project) if project is not None else None),
+        "project": None if project is None else {
+            "project_id": project.project_id, "name": project.name, "revision": project.revision,
+            "maturity": project.authority.maturity, "domain_pack": project.domain_pack},
+        "fidelity": (analysis or {}).get("fidelity") or ("verification" if score.get("fidelity") == "high"
+                                                         else "screening"),
+        "analysis": analysis,
+        "sources": [s.model_dump(mode="json") for s in getattr(pack, "sources", [])],
+        "limitations": [GENERIC_LIMITATION] + list(getattr(pack, "limitations", [])),
     }
 
 

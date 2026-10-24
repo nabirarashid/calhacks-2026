@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from shared.contracts import (
     CONTRACT_VERSION, BudgetStatus, DesignSpace, Goal, ModelBudget, RunConfig, RunSummary,
 )
+from shared.manifest import ManifestUpdate, ProjectManifest
 
 from backend import evidence, llm, replay
 from backend.agents import goal_parser
@@ -38,12 +39,14 @@ log.info("modes: %s", W.modes)
 
 class ParseGoalRequest(BaseModel):
     text: str
-    design_space_id: str = "fin_v1"
+    project_id: Optional[str] = None
+    design_space_id: str = "fin_v1"            # v1 alias; project_id wins when given
 
 
 class StartRunRequest(BaseModel):
     goal: Goal
-    design_space_id: str = "fin_v1"
+    project_id: Optional[str] = None
+    design_space_id: str = "fin_v1"            # v1 alias; project_id wins when given
     config: Dict[str, Any] = {}
 
 
@@ -65,10 +68,34 @@ class DiscoverRequest(BaseModel):
     probe: bool = False
 
 
-def _space(space_id: str) -> DesignSpace:
-    if space_id not in W.spaces:
-        raise HTTPException(404, "unknown design space %r" % space_id)
-    return W.spaces[space_id]
+def _space(ref: str) -> DesignSpace:
+    """A project id or a design space id (v1 alias) -> the runtime design space."""
+    try:
+        return W.resolve(ref)
+    except KeyError:
+        raise HTTPException(404, "unknown project or design space %r" % ref)
+
+
+def _run_space(summary: Dict[str, Any]) -> DesignSpace:
+    return _space(summary.get("design_space_id") or "fin_v1")
+
+
+def _project(space: DesignSpace) -> Optional[ProjectManifest]:
+    return W.project_for_space(space.id)
+
+
+def _require(space: DesignSpace, action: str) -> Optional[ProjectManifest]:
+    """Capabilities never exceed the project's maturity level (Roadmap v2 §2)."""
+    m = _project(space)
+    if m is not None and action not in m.authority.permitted:
+        raise HTTPException(409, "project %s is level %d (%s not permitted)"
+                            % (m.project_id, m.authority.maturity, action))
+    return m
+
+
+def _binding(space: DesignSpace) -> Optional[Dict[str, Any]]:
+    m = _project(space)
+    return evidence.binding_for(m) if m is not None else None
 
 
 def _events(run_id: str) -> List[Dict[str, Any]]:
@@ -110,7 +137,9 @@ def design_spaces() -> List[Dict[str, Any]]:
 
 
 @app.get("/api/metrics")
-def metrics(scorer: str = "fin_v1") -> List[Dict[str, Any]]:
+def metrics(scorer: str = "fin_v1", project_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    if project_id:
+        scorer = _space(project_id).scorer
     try:
         return [m.model_dump(mode="json") for m in W.catalog(scorer)]
     except KeyError:
@@ -118,8 +147,38 @@ def metrics(scorer: str = "fin_v1") -> List[Dict[str, Any]]:
 
 
 @app.get("/api/presets")
-def presets() -> List[Dict[str, Any]]:
-    return [p.model_dump(mode="json") for p in W.presets]
+def presets(project_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    out = W.presets
+    if project_id:
+        out = goal_parser.compatible_presets(out, W.catalog(_space(project_id).scorer))
+    return [p.model_dump(mode="json") for p in out]
+
+
+# ------------------------------------------------------------------ projects (contracts v2, PLAN.md v3 B.7)
+
+@app.get("/api/projects")
+def projects() -> List[Dict[str, Any]]:
+    return [p.model_dump(mode="json") for p in W.projects.summaries()]
+
+
+@app.get("/api/projects/{project_id}/manifest")
+def get_manifest(project_id: str) -> Dict[str, Any]:
+    try:
+        return W.public_manifest(W.projects.get(project_id)).model_dump(mode="json")
+    except KeyError:
+        raise HTTPException(404, "unknown project %r" % project_id)
+
+
+@app.post("/api/projects/{project_id}/manifest")
+def update_manifest(project_id: str, body: ManifestUpdate) -> Dict[str, Any]:
+    try:
+        m = W.projects.update(project_id, body)
+    except KeyError:
+        raise HTTPException(404, "unknown project %r" % project_id)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    W._activate(m)
+    return W.public_manifest(m).model_dump(mode="json")
 
 
 @app.post("/api/goal/parse")
@@ -129,14 +188,18 @@ def parse_goal(req: ParseGoalRequest) -> Dict[str, Any]:
         raise HTTPException(422, "text is required")
     if len(text) > 1000:
         raise HTTPException(422, "goal text is limited to 1000 characters")
-    space = _space(req.design_space_id)
-    goal, _ = goal_parser.parse_goal(text, space, W.catalog(space.scorer), W.presets)
+    space = _space(req.project_id or req.design_space_id)
+    try:
+        goal, _ = goal_parser.parse_goal(text, space, W.catalog(space.scorer), W.presets)
+    except llm.LLMUnavailable as e:
+        raise HTTPException(503, str(e))
     return goal.model_dump(mode="json")
 
 
 @app.post("/api/runs")
 def start_run(req: StartRunRequest) -> Dict[str, str]:
-    space = _space(req.design_space_id)
+    space = _space(req.project_id or req.design_space_id)
+    _require(space, "optimize")
     try:
         config = RunConfig.model_validate(req.config)
     except Exception as e:  # noqa: BLE001
@@ -241,9 +304,10 @@ def commit(run_id: str, req: DesignRequest) -> Dict[str, Any]:
         raise HTTPException(409, "only the completed run champion can be committed")
     if req.design_id != champion.get("design_id"):
         raise HTTPException(409, "only the completed run champion can be committed")
-    if evidence.load_approval(run_id, champion) is None:
+    space = _run_space(summary)
+    if evidence.load_approval(run_id, champion, _binding(space)) is None:
         raise HTTPException(409, "the completed run champion must be approved before commit")
-    space = _space(summary["design_space_id"])
+    _require(space, "write")
     return W.cad.commit_to_document(space, champion["params"]).model_dump(mode="json")
 
 
@@ -255,7 +319,8 @@ def approve(run_id: str, req: ApprovalRequest) -> Dict[str, Any]:
     if champion.get("design_id") != design.get("design_id"):
         raise HTTPException(409, "only the completed run champion can be approved")
     try:
-        return evidence.approve(run_id, summary, design, req.approved_by)
+        return evidence.approve(run_id, summary, design, req.approved_by,
+                                binding=_binding(_run_space(summary)))
     except ValueError as exc:
         raise HTTPException(409, str(exc))
 
@@ -264,7 +329,7 @@ def approve(run_id: str, req: ApprovalRequest) -> Dict[str, Any]:
 def approval(run_id: str) -> Dict[str, Any]:
     summary = _summary(run_id)
     design = summary.get("champion") or {}
-    record = evidence.load_approval(run_id, design)
+    record = evidence.load_approval(run_id, design, _binding(_run_space(summary)))
     if record is None:
         raise HTTPException(404, "this champion has not been approved")
     return record
@@ -276,13 +341,15 @@ def run_evidence(run_id: str) -> Dict[str, Any]:
     design = summary.get("champion")
     if not design:
         raise HTTPException(409, "run has no champion yet")
-    return evidence.build_evidence(run_id, summary, design)
+    space = _run_space(summary)
+    return evidence.build_evidence(run_id, summary, design, _project(space), W.packs.get(
+        W.space_project.get(space.id, "")))
 
 
 @app.post("/api/runs/{run_id}/export")
 def export(run_id: str, req: DesignRequest) -> FileResponse:
     d = _find_design(run_id, req.design_id)
-    space = _space(_summary(run_id)["design_space_id"])
+    space = _run_space(_summary(run_id))
     try:
         z = W.cad.export_print_package(space, d["params"], runs_dir().parent / "exports")
     except NotImplementedError as e:
@@ -305,7 +372,9 @@ def report(run_id: str) -> HTMLResponse:
             break
     if not s.champion:
         raise HTTPException(409, "run has no champion yet")
-    data = evidence.build_evidence(run_id, summary, s.champion.model_dump(mode="json"))
+    space = _run_space(summary)
+    data = evidence.build_evidence(run_id, summary, s.champion.model_dump(mode="json"), _project(space),
+                                   W.packs.get(W.space_project.get(space.id, "")))
     return HTMLResponse(evidence.render_html(data, narrative))
 
 
