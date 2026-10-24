@@ -237,7 +237,8 @@ class Notebook(BaseModel):
 | `flap_chord_frac` | – | 0.20–0.40 | 0.30 |
 | `endplate_height_mm` | mm | 100–300 | 200 |
 
-- **Fixed:** airfoil (inverted NACA 4412 main and flap), flap gap, mount positions, ride height.
+- **Fixed:** airfoil (inverted NACA 4412), mount positions, ride height. The flap gap is
+  **not modelled** (see the modelling note below).
 - **Context:** `velocity_mps` = 25, `rho` = 1.225 kg/m³.
 
 **Metrics:**
@@ -245,8 +246,27 @@ class Notebook(BaseModel):
 - `drag_induced_n`, `drag_profile_n`
 - `cl`, `stall_margin_deg`, `span_efficiency`, `aspect_ratio_eff`, `reynolds`
 
-W-B may rename until 16:00, then the names are frozen. **The demo goal uses `downforce_n`
-(maximize) and `drag_n` (≤ limit).**
+**FROZEN Sat 15:15 by W-B (B1).** Names, units and ranges above are final; changes now go
+through `sim/CONTRACT_REQUESTS.md`. **The demo goal uses `downforce_n` (maximize) and
+`drag_n` (≤ limit).**
+
+Verified before freezing (`sim/PHYSICS.md` will carry the full numbers):
+- **All 64 corners of the six ranges evaluate**, 0 failures, worst 17.5 ms including the
+  stall sweep (budget 100 ms).
+- **Modelling note — the flap is a hinged trailing-edge surface on one NACA 4412 section,
+  not a second lifting surface.** Tested both at the default (AoA 6°, flap 15°): as two
+  isolated surfaces the flap sits at 21° local incidence, stalls, and adds only **+4 %**
+  downforce while its drag climbs, which would teach the agent that the flap is useless. As a
+  hinged flap NeuralFoil sees the deflected section and the flap adds **+67 %** downforce,
+  plateauing by 30°, which is how a race-car flap behaves. The slot/gap effect of a real
+  two-element wing is not modelled, so maximum downforce is **conservative** (plain flaps
+  separate earlier than slotted ones).
+- **`stall_margin_deg` = section stall angle − `aoa_deg`.** The stall angle is where
+  NeuralFoil's CL peaks for the deflected section at the run's Reynolds number: 13.5° clean,
+  9.5° at 15° flap, 5.5° at 35° (Re ≈ 4.8×10⁵). The default design has **+3.5°** margin;
+  negative margin is treated as infeasible by the loop.
+- **Inverted wing:** solved as a NACA 4412 at positive AoA and reported as downforce. With no
+  ground effect modelled the two are mirror images, so this is exact within the model.
 
 ### B.6 Session API (owner W-C)
 
@@ -382,7 +402,8 @@ The structural/FEA work is parked: leave the files, stop work.
 - [ ] **B1 (by 16:00)** Freeze the B.5 names and ranges (edit B.5 here, or tell W-C before 16:00).
 - [ ] **B2 (by 18:00) `sim/plugins/rear_wing_v1.py`** as a ScorerPlugin (`metric_catalog`,
   `metrics`, `evaluate_metrics`, `hifi`), registered as scorer `rear_wing_v1`:
-  - main + flap as two lifting surfaces
+  - main + flap as **one section with a hinged trailing-edge flap** (`asb.ControlSurface`);
+    two isolated surfaces stall the flap and were rejected, see B.5
   - NeuralFoil polars
   - endplate effective aspect ratio: `AR_eff = AR·(1 + 1.9·h/b)`, cited (Hoerner)
   - every B.5 metric

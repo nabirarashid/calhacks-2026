@@ -8,3 +8,7 @@ aerosandbox==4.2.8
 scikit-fem<10
 gmsh>=4.11
 meshio>=5.3
+
+# Aero (W-B, rear_wing_v1). NeuralFoil 0.3.3 requires Python >= 3.10, so 0.3.2 is the
+# last release that runs on our 3.9 pin -- the same trap as aerosandbox 4.2.8 above.
+neuralfoil==0.3.2
