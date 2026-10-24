@@ -96,3 +96,26 @@ def strategist_schema(space: DesignSpace) -> Dict[str, Any]:
 def report_schema() -> Dict[str, Any]:
     return _obj({"headline": {"type": "string"}, "narrative": {"type": "string"},
                  "caveats": _str_list()})
+
+
+def investigator_plan_schema(editable: List[str], metrics: List[str], principle_ids: List[str]) -> Dict[str, Any]:
+    setting = _obj({"param": {"type": "string", "enum": editable}, "value": {"type": "number"}})
+    prediction = _obj({"metric": {"type": "string", "enum": metrics},
+                       "direction": {"type": "string", "enum": ["up", "down", "flat"]},
+                       "pct_low": {"type": "number"}, "pct_high": {"type": "number"}})
+    pids = {"type": "array", "items": {"type": "string", "enum": principle_ids}} if principle_ids \
+        else {"type": "array", "items": {"type": "string"}}
+    return _obj({
+        "stop": {"type": "boolean"},
+        "stop_reason": {"type": "string"},
+        "levers": _str_list(editable),
+        "candidates": {"type": "array", "items": _obj({"settings": {"type": "array", "items": setting}})},
+        "principle_ids": pids,
+        "rationale": {"type": "string"},
+        "predictions": {"type": "array", "items": prediction},
+    })
+
+
+def investigator_analyze_schema() -> Dict[str, Any]:
+    return _obj({"explanation": {"type": "string"}, "lesson": {"type": "string"}})
+

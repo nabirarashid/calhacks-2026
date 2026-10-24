@@ -50,7 +50,10 @@ class AeroPack:
 
     @property
     def prompt_fragment(self) -> str:
-        return (_HERE / "principles.md").read_text()
+        """Only the "## all" intro. The principles reach the model solely through the investigator's
+        plan input, so DARWIN_KNOWLEDGE=off really removes them (the ablation)."""
+        text = (_HERE / "principles.md").read_text()
+        return re.split(r"\n<!--|\n### ", text, maxsplit=1)[0].strip() + "\n"
 
     def principles(self) -> List[Dict[str, str]]:
         """The knowledge layer. DARWIN_KNOWLEDGE=off removes it (the proof-bench ablation)."""

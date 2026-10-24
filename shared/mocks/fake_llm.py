@@ -116,6 +116,45 @@ def _strategist(inp: Dict[str, Any]) -> Dict[str, Any]:
             "reason": "stagnated %d generations" % stagnation if stagnation else "still improving"}
 
 
+def _investigator_plan(inp: Dict[str, Any]) -> Dict[str, Any]:
+    """A plausible, deterministic engineer: try each untried lever once, then the best measured one."""
+    nb = inp.get("notebook", {})
+    ruled = set(nb.get("ruled_out", []))
+    effects = nb.get("lever_effects_pct_per_unit", {})
+    objectives = inp.get("goal", {}).get("objectives") or [{"metric": "", "direction": "maximize"}]
+    obj, maximize = objectives[0]["metric"], objectives[0].get("direction") != "minimize"
+    tried = {lv for s in inp.get("last_steps", []) for lv in s.get("levers", [])} | set(effects)
+    open_params = [p for p in inp.get("editable", []) if p["name"] not in ruled]
+    if not open_params:
+        return {"stop": True, "stop_reason": "every lever is ruled out", "levers": [], "candidates": [],
+                "principle_ids": [], "rationale": "", "predictions": []}
+    untried = [p for p in open_params if p["name"] not in tried]
+    pick = untried[0] if untried else max(open_params, key=lambda p: abs(effects.get(p["name"], {}).get(obj, 0)))
+    eff = effects.get(pick["name"], {}).get(obj)
+    sign = -1.0 if (eff is not None and (eff < 0) == maximize) else 1.0
+    span = float(pick["max"] - pick["min"])
+    cands = []
+    for frac in (0.08, 0.16):
+        v = min(pick["max"], max(pick["min"], float(pick["current"]) + sign * frac * span))
+        cands.append({"settings": [{"param": pick["name"], "value": round(v, 3)}]})
+    pid = next((p["id"] for p in inp.get("principles", []) if pick["name"] in p.get("levers", "")), None)
+    lo, hi = (2.0, 25.0) if maximize else (-25.0, -2.0)
+    return {"stop": False, "stop_reason": "", "levers": [pick["name"]], "candidates": cands,
+            "principle_ids": [pid] if pid else [],
+            "rationale": "Test %s %s, the %s lever, to see how it moves %s." % (
+                pick["name"], "up" if sign > 0 else "down", "least explored" if untried else "best measured", obj),
+            "predictions": [{"metric": obj, "direction": "up" if maximize else "down", "pct_low": lo, "pct_high": hi}]}
+
+
+def _investigator_analyze(inp: Dict[str, Any]) -> Dict[str, Any]:
+    pct = inp.get("pct_change", {})
+    names = [c["metric"] for c in inp.get("predictions", [])] or list(pct)[:2]
+    parts = ["%s changed %s%%" % (m, pct[m]) for m in names if m in pct]
+    lever = ", ".join(inp.get("hypothesis", {}).get("levers", []))
+    return {"explanation": "Changing %s: %s. Verdict %s." % (lever, "; ".join(parts), inp.get("verdict", "")),
+            "lesson": "%s %s the goal here." % (lever, "helps" if inp.get("verdict") == "accepted" else "does not help")}
+
+
 def _respond(role: str, inp: Dict[str, Any], rng: random.Random) -> Dict[str, Any]:
     if role == "proposer":
         return _proposer(inp, rng)
@@ -125,6 +164,10 @@ def _respond(role: str, inp: Dict[str, Any], rng: random.Random) -> Dict[str, An
         return _critic(inp, rng)
     if role == "strategist":
         return _strategist(inp)
+    if role == "investigator_plan":
+        return _investigator_plan(inp)
+    if role == "investigator_analyze":
+        return _investigator_analyze(inp)
     if role == "binder":
         names = inp.get("scorer_inputs", [])
         return {"mapping": {n: n for n in inp.get("discovered", []) if n in names}}
@@ -156,4 +199,5 @@ def call_model(role: str, system: str, user: str, schema: Optional[dict] = None,
 
 
 def roles() -> List[str]:
-    return ["goal_parser", "proposer", "critic", "strategist", "reporter", "binder"]
+    return ["goal_parser", "proposer", "critic", "strategist", "reporter", "binder", "investigator_plan",
+            "investigator_analyze"]
