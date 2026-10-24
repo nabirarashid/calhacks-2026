@@ -144,3 +144,42 @@ def test_concurrent_charges_never_breach_floor(tmp_path):
     assert len(granted) == 10, "exactly the spendable calls, no more"
     assert len(refused) == 30
     assert led.remaining_estimate() == 50
+
+
+def test_baseline_offset_is_compared_as_time_not_string(tmp_path):
+    """A local-time baseline must not mis-count UTC entries.
+
+    The baseline is typed by a human reading Onshape's usage page in Pacific
+    time; our entries are UTC. Lexically "...T07:00:00+00:00" sorts after
+    "...T01:00:00-07:00", but 07:00Z is one hour EARLIER than 01:00-07:00
+    (= 08:00Z), so a string compare counts a pre-baseline call.
+    """
+    led = mk(tmp_path, calls_remaining=100, reserve=0,
+             remaining_at="2026-10-24T01:00:00-07:00")      # = 08:00Z
+    led._append({"kind": "call", "seq": 1, "ts": "2026-10-24T07:00:00+00:00",
+                 "account": "dev-test", "purpose": "before", "method": "GET",
+                 "path": "/stl", "status": 200})
+    assert led.calls_total() == 0, "a call before the baseline must not count"
+
+    led._append({"kind": "call", "seq": 2, "ts": "2026-10-24T09:00:00+00:00",
+                 "account": "dev-test", "purpose": "after", "method": "GET",
+                 "path": "/stl", "status": 200})
+    assert led.calls_total() == 1
+    assert led.remaining_estimate() == 99
+
+
+def test_unparseable_baseline_counts_everything(tmp_path):
+    """A malformed baseline must err toward refusing calls, not spending them."""
+    led = mk(tmp_path, calls_remaining=100, reserve=0, remaining_at="not-a-date")
+    for _ in range(3):
+        led.charge("build")
+    assert led.calls_total() == 3
+
+
+def test_naive_baseline_treated_as_utc(tmp_path):
+    led = mk(tmp_path, calls_remaining=100, reserve=0,
+             remaining_at="2026-10-24T08:00:00")
+    led._append({"kind": "call", "seq": 1, "ts": "2026-10-24T07:00:00+00:00",
+                 "account": "dev-test", "purpose": "before", "method": "GET",
+                 "path": "/stl", "status": 200})
+    assert led.calls_total() == 0

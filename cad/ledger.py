@@ -30,6 +30,28 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _parse_ts(value: str) -> Optional[datetime]:
+    """Parse an ISO timestamp to an aware datetime, or None.
+
+    Compared as datetimes, never as strings: the baseline comes from a human
+    reading Onshape's usage page in local time while our own entries are UTC,
+    so "2026-10-24T07:00:00+00:00" > "2026-10-24T01:00:00-07:00" is true
+    lexically and false in fact.
+    """
+    if not value:
+        return None
+    text = value.strip()
+    if text.endswith("Z"):                 # fromisoformat rejects Z before 3.11
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:                  # naive baseline: assume UTC
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 class Ledger(object):
     """One ledger per Onshape account label.
 
@@ -86,9 +108,19 @@ class Ledger(object):
     def _counted(self, entries: List[Dict]) -> int:
         """Calls counted against the baseline: every 'call' line at/after it."""
         calls = [e for e in entries if e.get("kind") == "call"]
-        if self.remaining_at:
-            return len([e for e in calls if str(e.get("ts", "")) >= self.remaining_at])
-        return len(calls)
+        if not self.remaining_at:
+            return len(calls)
+        base = _parse_ts(self.remaining_at)
+        if base is None:
+            # An unparseable baseline must not silently under-count: fall back
+            # to counting everything, which errs toward refusing calls.
+            return len(calls)
+        out = 0
+        for e in calls:
+            ts = _parse_ts(str(e.get("ts", "")))
+            if ts is None or ts >= base:
+                out += 1
+        return out
 
     def calls_total(self) -> int:
         return self._counted(self._read_lines())
