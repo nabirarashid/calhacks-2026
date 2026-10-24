@@ -210,6 +210,54 @@ permission.
 
 ### 8. Roadmap and acceptance gates
 
+#### Submission scope — decided Sat Oct 24, deadline Sun 09:00
+
+The original plan froze features Sat 23:00 to leave a rehearsal buffer. The team
+has instead chosen to build until early Sunday and target **more than one
+domain**. This subsection is the operative schedule; where it conflicts with
+Part E below, this wins.
+
+**Budget.** ~22 h of wall clock to the 09:00 Devpost deadline, minus ~5 h sleep
+each, is roughly **68 person-hours** across four people. Rehearsals, Devpost,
+the fallback video and prints take ~10, leaving **~58 person-hours to build**.
+
+**Target, in strict priority order.** Each item is shippable on its own, so
+whatever is reached is coherent.
+
+| # | Item | Est. | Why this order |
+|---|---|---|---|
+| 1 | Live Onshape write: apply, read back, verify geometry, named version | ~2 h | Independent of every refactor, and the one moment nobody else will have. Bank it first. |
+| 2 | Phase 1 platform extraction (registry, generic verifier, domain pack) | 8–15 h | Gating: no second domain can be added without hacking the core until this lands. |
+| 3 | Capability reports on 2–3 arbitrary Part Studios (read-only, level 1) | ~2 h | Needs no Phase 1, no physics, no validation. Cheap proof of "not fin-hardcoded". |
+| 4 | Second domain: drone arm / bracket (Euler–Bernoulli, closed form) | ~7 h | Most validatable second domain; analytical references exist. |
+| 5 | Third domain: heat sink (fin efficiency + convection correlations) | ~7 h | Only with the validity envelope stated explicitly. |
+
+**Explicitly not attempted:** a fluid-passage/CFD domain. Meshing, turbulence
+modeling and convergence are not a one-night scorer, and it is the domain where
+a wrong answer is most confidently wrong. A compliant flexure or snap-fit is
+beam mechanics again and is the safer fourth if there is time.
+
+**Abort gates.** These exist so a refactor cannot eat the demo:
+
+- **Phase 1 not green by Sat 18:00** (fin passing end to end through the generic
+  interfaces, full suite green) → stop Phase 1, revert to the working fin path,
+  ship one domain plus capability reports.
+- **Second domain scorer not passing its validation tests by Sun 02:00** → ship
+  it as inventory-only with a capability report. Do not ship an unvalidated
+  scorer; rules 3 and 7 in section 3 are not negotiable for a deadline.
+- **Hard new-feature cutoff Sun 05:00.** After that: rehearsal, Devpost, video
+  and fixes from a written list only. Judging is a live demo at 10:30; a broken
+  demo loses regardless of how many domains are in the repo.
+
+**Degradation ladder for scope** (the honest claim at each level):
+
+1. Fin only, read-only export — "validated in one domain".
+2. Plus live write — "and it changes, verifies and versions your real CAD".
+3. Plus capability reports — "and it inventories any parameterized Part Studio,
+   and tells you what it cannot do".
+4. Plus one validated second domain — "and the architecture transfers".
+5. Plus a third — "across three domains".
+
 #### Phase 0 — finish and freeze the fin reference workflow
 
 - [x] Deterministic evidence, engineering diff and failure-to-correction review.
@@ -504,10 +552,14 @@ development copy only after explicit write opt-in.
 
 ### Post-hackathon
 
-Add a structural `SolverAdapter` on a controlled second part only after the fin
-workflow is complete. The second part must have a defensible load case, material
-model, mesh-convergence check, manufacturing rules, and an evidence schema. It
-is the proof of multi-domain architecture, not part of the current submission.
+**Superseded for this submission** — see "Submission scope" in Roadmap v2. The
+team decided on Sat Oct 24 to attempt additional domains before the 09:00
+deadline rather than defer all of them.
+
+The standard for a domain does not relax: any second or third `SolverAdapter`
+still needs a defensible load case, material model, convergence check,
+manufacturing rules and an evidence schema. A domain that cannot meet that bar
+ships as inventory-only with a capability report, not as a scorer.
 
 ## Archived original hackathon plan
 
@@ -1324,7 +1376,10 @@ Each section repeats only the contract pieces it needs. Everything referenced as
 - **STL export:** `GET …/stl?units=millimeter` with `Accept: application/vnd.onshape.v1+octet-stream`.
   - It may redirect. Use `allow_redirects=False`, then re-request `Location` with auth.
   - Output is ASCII STL by default. Parse with a regex on `vertex x y z`.
-- **Timing:** about 1.6–1.9 s per design for update plus export.
+- **Timing:** about 1.6–1.9 s per design for *update plus export* (the write path).
+  **Configured export measured 250–490 ms** (Oct 23 spike, every run), because it
+  skips the document write entirely. Geometry is not on the critical path for a
+  60-second demo.
 
 #### Checklist
 
@@ -1340,7 +1395,11 @@ Each section repeats only the contract pieces it needs. Everything referenced as
 
 **Configuration spike** (≤ 60 min, ≤ 15 calls on the **dev** account). Write `cad/SPIKE.md` with the verdict. Keep raw responses in gitignored `cad/SPIKE_raw/`.
 1. [ ] `GET /elements/d/{did}/w/{wid}/e/{eid}/configuration` (1 call) to get the configuration parameter ids, types and ranges. Save it: discovery reuses this format.
-2. [ ] `POST …/configurationencodings` with two parameter values (1 call) to learn the exact encoding string. Then implement local encoding (`name=value+unit;name2=…`, URL-encoded) so no further encoding calls are needed.
+2. [x] ~~`POST …/configurationencodings`~~ **returns 404 on `/api/v10`** — do not
+   spend a call on it. Local encoding (`name=value+unit;name2=…`, URL-encoded) in
+   `cad.onshape_client.encode_configuration` is **verified correct**: three param
+   sets across the box exported volumes matching the analytic formula exactly.
+   Costs 0 calls per design.
 3. [ ] `GET …/partstudios/d/{did}/w/{wid}/e/{eid}/stl?units=millimeter&configuration=<encoded>` for 3 different param sets (3 to 6 calls including redirects). Check that each bbox matches B.5 analytic values within 0.5 mm, and that the document's microversion is **unchanged** (no writes).
 4. [ ] Send an out-of-range or failing configuration. Record exactly what comes back (4xx, an empty STL, or a stale body). This defines regeneration-failure detection.
 5. [ ] Optional: `GET …/massproperties?configuration=…` (1 call). Compare the volume to the analytic V, for the high-fidelity validation story.
@@ -2010,7 +2069,7 @@ Owners: **S1** CAD · **S2** Sim · **S3** Backend and contracts · **S4** Dashb
 | 1:00 | Champion updates. "Onshape-verified ✓" badge; Onshape tab regenerates the part (commit) | "That's not a picture. The real parametric model in Onshape just regenerated. One API call per design, cached, and metered, because our API budget is finite." |
 | 1:20 | Winner card: before and after, agent versus baseline | "Better than CMA-ES at this budget. Over our benchmark of 6 goals × 3 seeds, the median result is <bench number>." Use the real number, or say "comparable" honestly. |
 | 1:35 | **Hand the judge the printed fin** (plus the CMA-ES fin) | "This is this goal's champion from this morning, printed solid PLA. The sim predicted <x> g; put it on the scale." |
-| 1:50 | Discovery (Tier 3) or close | "And it's not hard-coded to fins: paste any Onshape Part Studio URL, and Darwin finds its parameters. This morning we did it for a <second part>." |
+| 1:50 | Onboarding a second object, at the maturity level actually reached | "And it is not hard-coded to fins. Paste any Onshape Part Studio URL and Darwin inventories it: these parameters, these units, these ranges. <If a second domain shipped: and here it is optimizing a <second part> against a validated <domain> adapter.> <If not: it will not optimize this one, because no validated adapter is installed for its physics — and it says so instead of guessing.>" |
 
 **Physics limits (say this unprompted, in one breath):**
 "It's fast, semi-empirical physics: subsonic, small angles of attack, a fixed reference rocket, and a screening-level flutter estimate. It's built for ranking designs and exploring tradeoffs, not for certifying a flight. The champion gets a slower vortex-lattice check, and the assumptions page lists everything."
@@ -2023,7 +2082,8 @@ Owners: **S1** CAD · **S2** Sim · **S3** Backend and contracts · **S4** Dashb
 | How do you know the physics is right? | Standard rocketry methods (Barrowman, which OpenRocket uses), AeroSandbox's validated buildup, monotonicity and known-shape tests, a vortex-lattice cross-check, STL volume agreeing with sim volume within 3 %, and the printed part weighed against the prediction. |
 | What if the LLM hallucinates? | Numbers never come from the LLM. Every candidate is clamped and validated, then simulated. A numeric-claim check strips critic numbers that aren't in the data. The critic flags suspicious results. If the LLM fails, a GA takes over and the UI says so. |
 | Why not just run CMA-ES? | At small budgets, priors win. CMA-ES also gives you no explanation and no natural-language goal. We include it, honestly, as the baseline. |
-| Does it generalize? | Auto-discovery reads any Part Studio's configuration inputs or variables and proposes bounds. Scoring needs a scorer plugin per physics domain. We showed a second part. |
+| Does it generalize? | Two separate questions. A **new object in a supported domain** is mostly an onboarding problem: we read the Part Studio's configuration inputs and ranges and build a reviewed manifest. A **new physics domain** needs a validated solver adapter and domain pack, which is bounded expert work, not something a model can infer. Anything we cannot support returns a capability report saying what is missing and which adapter it would need. Every project carries an explicit maturity level (0-4) and never acts above it. |
+| Does every new object need its own simulation? | Yes, and that is deliberate. Physics does not generalize; orchestration does. The request-to-approved-change loop is domain-agnostic and any validated solver plugs in through one `SolverAdapter` interface. Adding a domain means defining the pack, implementing the adapter and validating it against analytical references. We will not let a language model guess at stress or drag: a plausible wrong number is worse than a blocked one, because nobody catches it. |
 | Onshape API limits? | Scoring never touches Onshape, there's 1 call per champion through configured exports, a geometry cache, and a ledger with a hard reserve. The dashboard shows calls left. |
 | Cost per run? | About $0.08 of Claude: Haiku for the loop, Sonnet once for the report. Hard caps apply per run and per event. |
 | Who's the user, and did you talk to them? | Collegiate rocketry teams. <Name/role of the rocketry contact and their quote>. Only claim this if the conversation happened. |
