@@ -246,6 +246,26 @@ class Notebook(BaseModel):
 - `drag_induced_n`, `drag_profile_n`
 - `cl`, `stall_margin_deg`, `span_efficiency`, `aspect_ratio_eff`, `reynolds`
 
+**Geometry definition (W-B, Sat 16:15).** The names froze at 15:01; this pins down what they
+*mean*, so the part that morphs in Onshape is the part the solver scored. These are the
+solver's conventions (`sim/plugins/rear_wing_v1.py`), now written down for A2:
+- **`chord_mm` is the total chord**, leading edge of the main element to the flap's trailing
+  edge. It is *not* the main element alone.
+- **Main element = `(1 − flap_chord_frac) × chord_mm`; flap = `flap_chord_frac × chord_mm`;**
+  hinge at `(1 − flap_chord_frac) × chord_mm` from the leading edge. Default: main 196 mm,
+  flap 84 mm, total 280 mm. (Building the main element at `chord_mm` and the flap at
+  `frac × chord_mm` behind it would make a 364 mm wing scored as a 280 mm one.)
+- **`flap_angle_deg` is relative to the main element's chord line**, positive = flap trailing
+  edge toward the pressure side, i.e. more camber. On the inverted wing the flap's trailing edge
+  moves **up**, away from the ground.
+- **`aoa_deg` rotates the whole wing, main element and flap together**, about the mount axis;
+  positive = more downforce (leading edge down on the inverted wing).
+- **`span_mm`** is the total span between endplates; **`endplate_height_mm`** is the endplate
+  height used as `h` in Hoerner's correction.
+- **Airfoil and gap.** The solver models one NACA 4412 split at the hinge with no gap (a plain
+  flap). Two NACA 4412 profiles scaled to the main and flap chords, with a small fixed gap,
+  is the conventional build and is visually equivalent; keep the gap inside `chord_mm`.
+
 **FROZEN Sat 15:01 by W-B (B1).** Names, units and ranges above are final; changes now go
 through `sim/CONTRACT_REQUESTS.md`. **The demo goal uses `downforce_n` (maximize) and
 `drag_n` (≤ limit).**
@@ -377,10 +397,13 @@ W-A (A2 wing Part Studio) or W-D (D1 extension). W-C did A3 (`cad/variables.py`)
 - [x] **A1 Morph spike** — done 14:49 (W-C): feature updates morph live; configuration updates don't.
 - [ ] **A2 (by 18:00) Rear-wing Part Studio**, built on a dev account:
   - one **Variable feature per B.5 param** at the top of the feature list, named exactly as in B.5
-  - main element: airfoil profile from imported points or a spline, inverted, rotated by `#aoa_deg`
-    about the mount axis, extruded symmetric to `#span_mm`, chord `#chord_mm`
-  - flap: same profile, chord `#flap_chord_frac × #chord_mm`, rotated by `#flap_angle_deg` about
-    its hinge, with a fixed gap
+  - **dimensions per B.5 "Geometry definition"** — `#chord_mm` is the *total* chord (W-B, 16:15)
+  - main element: airfoil profile from imported points or a spline, inverted, chord
+    `(1 - #flap_chord_frac) × #chord_mm`, extruded symmetric to `#span_mm`
+  - flap: same profile, chord `#flap_chord_frac × #chord_mm`, hinged at the main element's
+    trailing edge, rotated by `#flap_angle_deg` **relative to the main element**, small fixed gap
+    kept inside `#chord_mm`
+  - rotate main element and flap **together** by `#aoa_deg` about the mount axis
   - endplates: height `#endplate_height_mm`, fixed thickness
   - uprights/mounts: fixed
   - Check every corner of the B.5 ranges regenerates; narrow a range and tell W-B before CP-C
@@ -442,7 +465,7 @@ The structural/FEA work is parked: leave the files, stop work.
   - the fin set: stability vs span/sweep, flutter vs thickness
   - Cite real sources (Anderson, Katz *Race Car Aerodynamics*, McBeath, Hoerner, the NeuralFoil
     paper); no invented numbers.
-- [ ] **B5 (by 01:00)** Validation table for `PHYSICS.md` and the pitch: what's validated
+- [x] **B5 (by 01:00)** ✅ *done 16:07 (W-B, `1fbda58`): `python -m sim.validation` regenerates every row; `sim/tests/test_validation.py` keeps it true* Validation table for `PHYSICS.md` and the pitch: what's validated
   against what, the error, and the validity envelope (subsonic, no ground effect, below stall
   for linear predictions).
 
