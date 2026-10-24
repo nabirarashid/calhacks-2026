@@ -120,3 +120,25 @@ Run by W-C on a disposable API copy of the fin document ("Darwin morph test
   `{"newName", "isPublic": false}`, 0.9 s, 1 call.
 - Configured export still works for read-only what-if geometry, and the default-config export
   reflects feature edits.
+
+## Variable features via the API (A3) — Sat Oct 24, 15:40–15:45, disposable copy
+
+Verified live (about 15 calls) and now wrapped by `cad/variables.py`:
+- **Insert a feature at the top:** move the rollback bar with `POST …/features/rollback` and body
+  `{"rollbackIndex": 0}` (exactly that; extra fields give HTTP 400), then `POST …/features` with a
+  `BTFeatureDefinitionCall-1406` (new features land at the rollback bar), then
+  `{"rollbackIndex": -1}` to restore it.
+- **Real Variable feature format:** `featureType: "assignVariable"` with three parameters:
+  `variableType` (`BTMParameterEnum-145`: LENGTH | ANGLE | NUMBER | ANY), `name`
+  (`BTMParameterString-149`), and the value quantity (`BTMParameterQuantity-147`) whose id
+  follows the type (`lengthValue`, `angleValue`, `numberValue`, `anyValue`). The value lives in
+  `expression` (e.g. `"3 mm"`); the numeric `value` field is 0 and must not be trusted.
+- A feature-update response carries a fresh `sourceMicroversion`, so sequential variable writes
+  don't need a re-read in between.
+- **End to end:** the copy's extrude depth was set to `#thick`, then
+  `cad.variables.apply_values(url, {"thick": 12}, {"thick": "mm"})` regenerated it from 3 to
+  12 mm (STL bbox ±1.5 → ±6.0 mm) in 0.8 s, with read-back "12 mm". A same-value call writes
+  nothing, and a document missing from `DARWIN_ONSHAPE_WRITE_DOCS` is refused.
+- **For the wing Part Studio (A2):** the six Variable features can be created by this same API
+  path once the document exists, with exact B.5 names. W-A only needs the geometry to reference
+  `#aoa_deg` etc.

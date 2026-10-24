@@ -358,10 +358,9 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 
 ## Part C: The four sections
 
-**Progress (Sat 15:45):** done: A1, B1, B2, B3, B4, C1, C2, C3. The investigator runs end to end on the
+**Progress (Sat 15:50):** done: A1, A3, B1, B2, B3, B4, C1, C2, C3. The investigator runs end to end on the
 real rear-wing solver (CP-C's terminal criterion is met). **Not yet visible in git:** anything from
-W-A (A2 wing Part Studio) or W-D (D1 extension). W-C is taking A3 (`cad/variables.py`) after C3,
-with the team's OK.
+W-A (A2 wing Part Studio) or W-D (D1 extension). W-C did A3 (`cad/variables.py`).
 
 ### W-A: Onshape (`cad/`, Part Studios, write path)
 
@@ -386,7 +385,7 @@ with the team's OK.
   - uprights/mounts: fixed
   - Check every corner of the B.5 ranges regenerates; narrow a range and tell W-B before CP-C
     if one doesn't.
-- [ ] **A3 (by 19:30) `cad/variables.py`** (B.7). *Taken by W-C after C3 (W-A's other items unchanged):*
+- [x] **A3 (by 19:30) `cad/variables.py`** (B.7). ✅ *done 15:50 by W-C: live-verified on the disposable copy (a Variable drove the extrude 3 → 12 mm in 0.8 s); 8 mocked tests; see `cad/SPIKE.md`*
   - `list_variables`, `apply_values`, `create_version`
   - mocked tests from a sanitized feature-list fixture
   - then live on the wing: write → re-GET → value matches → default STL bbox changes

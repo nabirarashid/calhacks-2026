@@ -125,6 +125,10 @@ class Ledger(object):
     def calls_total(self) -> int:
         return self._counted(self._read_lines())
 
+    def calls_logged(self) -> int:
+        """Every 'call' line ever written, independent of the baseline (for per-operation counts)."""
+        return sum(1 for e in self._read_lines() if e.get("kind") == "call")
+
     def remaining_estimate(self) -> int:
         if self.calls_remaining is None:
             return UNKNOWN_REMAINING

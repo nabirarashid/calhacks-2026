@@ -1,0 +1,188 @@
+{
+  "btType": "BTFeatureListResponse-2457",
+  "features": [
+    {
+      "btType": "BTMFeature-134",
+      "featureType": "assignVariable",
+      "name": "Variable aoa_deg",
+      "featureId": "Fvar00_0",
+      "parameters": [
+        {
+          "btType": "BTMParameterEnum-145",
+          "parameterId": "variableType",
+          "enumName": "VariableType",
+          "value": "ANGLE"
+        },
+        {
+          "btType": "BTMParameterString-149",
+          "parameterId": "name",
+          "value": "aoa_deg"
+        },
+        {
+          "btType": "BTMParameterQuantity-147",
+          "parameterId": "angleValue",
+          "expression": "6 deg",
+          "value": 0.0,
+          "isInteger": false
+        }
+      ]
+    },
+    {
+      "btType": "BTMFeature-134",
+      "featureType": "assignVariable",
+      "name": "Variable span_mm",
+      "featureId": "Fvar01_0",
+      "parameters": [
+        {
+          "btType": "BTMParameterEnum-145",
+          "parameterId": "variableType",
+          "enumName": "VariableType",
+          "value": "LENGTH"
+        },
+        {
+          "btType": "BTMParameterString-149",
+          "parameterId": "name",
+          "value": "span_mm"
+        },
+        {
+          "btType": "BTMParameterQuantity-147",
+          "parameterId": "lengthValue",
+          "expression": "850 mm",
+          "value": 0.0,
+          "isInteger": false
+        }
+      ]
+    },
+    {
+      "btType": "BTMFeature-134",
+      "featureType": "assignVariable",
+      "name": "Variable chord_mm",
+      "featureId": "Fvar02_0",
+      "parameters": [
+        {
+          "btType": "BTMParameterEnum-145",
+          "parameterId": "variableType",
+          "enumName": "VariableType",
+          "value": "LENGTH"
+        },
+        {
+          "btType": "BTMParameterString-149",
+          "parameterId": "name",
+          "value": "chord_mm"
+        },
+        {
+          "btType": "BTMParameterQuantity-147",
+          "parameterId": "lengthValue",
+          "expression": "280 mm",
+          "value": 0.0,
+          "isInteger": false
+        }
+      ]
+    },
+    {
+      "btType": "BTMFeature-134",
+      "featureType": "assignVariable",
+      "name": "Variable flap_angle_deg",
+      "featureId": "Fvar03_0",
+      "parameters": [
+        {
+          "btType": "BTMParameterEnum-145",
+          "parameterId": "variableType",
+          "enumName": "VariableType",
+          "value": "ANGLE"
+        },
+        {
+          "btType": "BTMParameterString-149",
+          "parameterId": "name",
+          "value": "flap_angle_deg"
+        },
+        {
+          "btType": "BTMParameterQuantity-147",
+          "parameterId": "angleValue",
+          "expression": "15 deg",
+          "value": 0.0,
+          "isInteger": false
+        }
+      ]
+    },
+    {
+      "btType": "BTMFeature-134",
+      "featureType": "assignVariable",
+      "name": "Variable flap_chord_frac",
+      "featureId": "Fvar04_0",
+      "parameters": [
+        {
+          "btType": "BTMParameterEnum-145",
+          "parameterId": "variableType",
+          "enumName": "VariableType",
+          "value": "NUMBER"
+        },
+        {
+          "btType": "BTMParameterString-149",
+          "parameterId": "name",
+          "value": "flap_chord_frac"
+        },
+        {
+          "btType": "BTMParameterQuantity-147",
+          "parameterId": "numberValue",
+          "expression": "0.3",
+          "value": 0.0,
+          "isInteger": false
+        }
+      ]
+    },
+    {
+      "btType": "BTMFeature-134",
+      "featureType": "assignVariable",
+      "name": "Variable endplate_height_mm",
+      "featureId": "Fvar05_0",
+      "parameters": [
+        {
+          "btType": "BTMParameterEnum-145",
+          "parameterId": "variableType",
+          "enumName": "VariableType",
+          "value": "LENGTH"
+        },
+        {
+          "btType": "BTMParameterString-149",
+          "parameterId": "name",
+          "value": "endplate_height_mm"
+        },
+        {
+          "btType": "BTMParameterQuantity-147",
+          "parameterId": "lengthValue",
+          "expression": "200 mm",
+          "value": 0.0,
+          "isInteger": false
+        }
+      ]
+    },
+    {
+      "btType": "BTMSketch-151",
+      "featureType": "newSketch",
+      "name": "Main element profile",
+      "featureId": "Fsk01_0",
+      "parameters": []
+    },
+    {
+      "btType": "BTMFeature-134",
+      "featureType": "extrude",
+      "name": "Main element",
+      "featureId": "Fex01_0",
+      "parameters": [
+        {
+          "btType": "BTMParameterQuantity-147",
+          "parameterId": "depth",
+          "expression": "#span_mm"
+        }
+      ]
+    }
+  ],
+  "serializationVersion": "1.2.9999",
+  "sourceMicroversion": "fixturemv000000000000000",
+  "rollbackIndex": 8,
+  "microversionSkew": false,
+  "rejectMicroversionSkew": false,
+  "libraryVersion": 2696,
+  "isComplete": true
+}
