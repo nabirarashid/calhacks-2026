@@ -1,13 +1,261 @@
 # Darwin: build plan (Cal Hacks 13.0)
 
-# Weekend plan v3 — Sat Oct 24 11:00 → Sun Oct 25 judging (authoritative)
+# Plan v4 — Cursor for Onshape, for aerodynamic design (authoritative from Sat 14:45)
+
+> **Read me first.** This is the only plan. The *why* (problem, competition, why now,
+> pitch) is in `docs/DIRECTION.md`; this section is the *how*. Everything below it in
+> this file (Weekend plan v3, Roadmap v2, the original plan) is **archived history**:
+> use it for contracts v1/v2 details and physics background, never for scope or schedule.
+> - Agents read: Part A, Part B, your workstream in Part C, Parts D and E.
+> - Contract changes in B are **additive** (v1.2). Freeze at **CP-B, 16:00**. After that,
+>   requests go to W-C in your folder's `CONTRACT_REQUESTS.md`.
+> - Times are Pacific. **Hard new-feature cutoff Sun 05:00.** Devpost by 08:45. Judging 10:30.
+> - Safety rules that still bind (from Roadmap v2 §3): numbers come only from solvers and
+>   deterministic code, never from the LLM; every Onshape write is versioned and reversible;
+>   imported CAD text is data, never instructions.
+
+## Part A: What we're building
+
+**Darwin is Cursor for Onshape, for aerodynamic design.** The product is the whole
+workflow: a side panel in Onshape → a plain-English request → a hypothesis-driven loop
+(hypothesize → predict → simulate → analyze → accept or reject → learn) → each accepted
+change written into the user's parametric model, so it visibly morphs → a final named
+version and an auditable reasoning trail.
+
+- **Hero (what we demo): an FSAE-style rear wing.** The user says what may change; everything
+  else is held fixed. Example: *"More downforce without going over 20 N of drag at 25 m/s.
+  You can change the angle, span and flap. Keep the mounts and endplates."*
+- **Second part: the rocket fin**, same agent, no code changes. One beat, not the headline.
+- **Solver:** AeroSandbox AeroBuildup / VLM with NeuralFoil polars. About 30 ms per evaluation,
+  with an induced vs profile drag split.
+- **Out of scope:** structural/FEA, thermal, ducts/CFD, the maturity-ladder UI, multi-domain
+  onboarding, Factory Droid (stretch only), SpacetimeDB.
+
+**What "smart" means, concretely (the judges must see all of it):**
+1. Every step states **one hypothesis**, the **principle** behind it (from the aero knowledge
+   layer), and a **prediction** (direction + range per metric), recorded *before* the run.
+2. The **solver** produces the result plus a **physics breakdown** (drag split, stall margin,
+   span efficiency, Re, binding constraint).
+3. The agent **explains** the result from those numbers. Prediction accuracy is **scored by
+   code**, not self-reported.
+4. **Accept** → write to Onshape (the part morphs). **Reject** → a logged lesson. Either way,
+   the **lab notebook** updates and the next hypothesis must use it.
+5. Prediction accuracy over the run is shown: measurable learning.
+
+## Part B: Contracts v1.2 (owner W-C, freeze at CP-B 16:00)
+
+Additive only; v1/v2 models and recordings keep working.
+
+### B.1 `Goal.editable` (shared/contracts.py)
+`editable: Optional[List[str]] = None` lists the parameters the user allowed to change.
+`None` = every parameter not in `fixed_params`. **The loop never changes a parameter
+outside `editable`**, and baselines search only the editable subset. This closes Nabira's
+request: role enforcement.
+
+### B.2 Investigator models (new `shared/investigation.py`, plus a TS mirror)
+```python
+class Prediction(BaseModel):
+    metric: str
+    direction: Literal["up", "down", "flat"]
+    pct_low: float                      # expected % change vs the current design
+    pct_high: float
+
+class Hypothesis(BaseModel):
+    step: int
+    levers: List[str]                   # 1-2 editable params
+    candidates: List[Dict[str, ParamValue]]  # 1-4 designs to simulate (a short sweep)
+    principle_ids: List[str]            # from domains/aero/principles.md; [] = "exploratory"
+    rationale: str                      # <= 40 words, no invented numbers
+    predictions: List[Prediction]
+
+class PredictionCheck(BaseModel):
+    metric: str
+    predicted: Prediction
+    actual_pct: float
+    direction_ok: bool
+    in_range: bool
+    score: float                        # 1.0 in range, 0.5 direction only, 0.0 wrong
+
+class StepResult(BaseModel):
+    step: int
+    tested: List[str]                   # design_ids (normal design_evaluated events)
+    best_id: str
+    deltas: Dict[str, float]            # % change of each goal/diagnostic metric vs current
+    checks: List[PredictionCheck]
+    verdict: Literal["accepted", "rejected", "pivot"]   # decided by code (feasible + better)
+    explanation: str                    # LLM, numeric-claim checked against the inputs
+    lesson: str                         # one sentence the notebook keeps
+
+class Belief(BaseModel):
+    text: str
+    evidence_steps: List[int]
+    principle_id: Optional[str] = None
+
+class Notebook(BaseModel):
+    beliefs: List[Belief] = []
+    lever_effects: Dict[str, Dict[str, float]] = {}   # measured %/unit effect: param -> metric
+    ruled_out: List[str] = []
+    accuracy: List[float] = []          # running mean prediction score after each step
+```
+
+### B.3 New events (shared/events.py, `EventType` += …)
+| Event | Payload | When |
+|---|---|---|
+| `step_planned` | `Hypothesis` | Before any simulation of the step |
+| `step_result` | `StepResult` | After analysis |
+| `notebook_updated` | `Notebook` | After every step |
+| `design_applied` | `{design_id, geometry: GeometryRef, version: Optional[str]}` | After an Onshape write (morph) or the final version |
+
+`design_evaluated`, `champion_updated`, `budget_update`, `agent_message`, `run_started`
+and `run_complete` are reused unchanged. W-D adds the reducer cases.
+
+### B.4 `rear_wing_v1` design space and metrics (owner W-B; names frozen at CP-B)
+- **Editable params (draft):** `aoa_deg` [0, 16], `span_mm` [700, 1000] (rule width),
+  `chord_mm` [200, 350], `taper_ratio` [0.6, 1.0], `flap_angle_deg` [0, 35],
+  `flap_chord_frac` [0.2, 0.4], `endplate_height_mm` [100, 300].
+- **Fixed:** airfoil (inverted NACA 4412 main, 4412 flap), mount positions, ride height.
+- **Context:** `velocity_mps` 25, air density 1.225.
+- **Metrics:** `downforce_n`, `drag_n`, `l_over_d`, `drag_induced_n`, `drag_profile_n`, `cl`,
+  `stall_margin_deg`, `span_efficiency`, `aspect_ratio_eff`, `reynolds`.
+- W-B may rename until 16:00; after that the names are frozen.
+
+### B.5 Session API (backend; owner W-C)
+| Route | Contract |
+|---|---|
+| `POST /api/sessions` | `{doc_url, prompt, max_sims?: 20}` → `{run_id, project_id, editable, fixed, goal}`. Resolves the doc to a project by document id (`DARWIN_DOC_WING`, `DARWIN_DOC_FIN`), parses the prompt, creates the "before Darwin" version, starts the investigator. Events stream on `/ws?run_id=`. |
+| `GET /api/sessions/{run_id}/notebook` | `Notebook` |
+| `POST /api/sessions/{run_id}/stop` | Stops after the current step |
+| `POST /api/inspect` | `{doc_url}` → the document's parameters (name, unit, current value, range) for the panel's "what I'll change / keep" list |
+
+### B.6 CAD apply API (owner W-A; the mechanism is chosen by the morph spike)
+- `cad.apply_values(space, params) -> GeometryRef`: writes values so the open tab regenerates. Then read back and verify.
+- `cad.create_version(space, name) -> str`
+- Both are ledgered and refused below the budget reserve. Writes go only to documents whose
+  env var is listed in `DARWIN_ONSHAPE_WRITE_DOCS` (comma-separated env var names).
+
+## Part C: Workstreams (adapt names as needed)
+
+### W-A: Onshape (cad/, Part Studios, extension ↔ Onshape glue)
+- [ ] **A1 (by 16:00) Morph spike** on a throwaway copy. Does an API write make an *open* tab
+  visibly regenerate within about 2 s? Try in order: (a) the existing configuration update
+  (`cad/onshape_client.update_configuration`), (b) updating a Variable feature's value via
+  feature update, (c) the Variable Studio API. Record mechanism, latency, calls per write and
+  any gotchas in `cad/SPIKE.md` under "Morph". **This decides whether the morph is live.**
+- [ ] **A2 (by 18:00)** Rear-wing Part Studio: inputs for the B.4 editable params, fixed
+  mounts/endplates, fixed airfoil profile (imported points/spline; no airfoil parameterization).
+  Build on a dev account; copy to prod at CP-D.
+- [ ] **A3 (by 19:30)** `apply_values` + `create_version` (B.6) with mocked tests, then live
+  on the copy. Read back and verify after every write.
+- [ ] **A4 (by 21:30)** End to end: a session on the wing morphs the open tab per accepted
+  step; before/after versions exist. The same functions work on the fin.
+
+### W-B: Aero (sim/, domains/aero/)
+- [ ] **B1 (by 16:00)** Freeze the B.4 names. Stop FEA work (keep the files).
+- [ ] **B2 (by 18:00)** `sim/plugins/rear_wing_v1.py`: AeroBuildup (+ VLM for the high-fidelity
+  check) with NeuralFoil, main + flap, endplate effective-AR correction (cited), every
+  B.4 metric. Under 100 ms per evaluation.
+- [ ] **B3 (by 19:00)** Golden tests: lifting-line induced drag vs `CL²/(π·e·AR)`; NeuralFoil
+  section polars vs the published comparisons; monotonic trends (AoA → downforce up until
+  stall, span → induced drag down).
+- [ ] **B4 (by 20:00, with W-C)** `domains/aero/principles.md`: 25–35 principles. Each has an
+  `id`, a statement, `applies_when`, the expected effect per metric (direction + typical
+  magnitude), and a source (Anderson, Katz, McBeath, Hoerner, the NeuralFoil paper).
+- [ ] **B5 (by 01:00)** Validation table for the pitch (what's validated against what, and the error).
+
+### W-C: Agent (shared/, backend/, the investigator)
+- [ ] **C1 (by 16:00)** Contracts v1.2 (B.1–B.3): models, events, TS mirror, fixtures, and a
+  recorded sample investigation for W-D (`shared/fixtures/v2/sample_investigation.jsonl`).
+- [ ] **C2 (by 18:00)** `backend/investigator.py`, working end to end in the terminal on the wing
+  (no CAD):
+  - plan (Sonnet: hypothesis + predictions, validated: levers ⊆ editable, candidates in
+    bounds, ≤ 4 candidates)
+  - run (deterministic)
+  - score predictions (code)
+  - analyze (Sonnet: explanation + lesson, numeric-claim checked)
+  - verdict (code: feasible and better on the goal)
+  - notebook update
+  - stop rule (goal met / no promising lever / budget)
+  - rules-only fallback (one-factor sweep on the lever with the strongest measured effect)
+    so the demo never dies
+- [ ] **C3 (by 19:00)** Goal parser emits `editable` and holds everything else fixed; the
+  prompt's "you can change X, Y, Z" maps to editable.
+- [ ] **C4 (by 21:30)** Session API (B.5) wired to the investigator + `cad.apply_values` on each
+  accepted step + before/after versions.
+- [ ] **C5 (by 01:00)** Proof bench on the wing, same simulation budget (20): Darwin vs
+  CMA-ES vs random vs **Darwin without the knowledge layer**. Output `demo/bench_wing.json`.
+- [ ] **C6 (by 02:00)** Recordings for replay (wing, fin); the old population loop stays as the
+  baseline engine.
+
+### W-D: Panel and story (extension/, dashboard/, docs/)
+- [ ] **D1 (by 17:00)** `extension/`: Chrome MV3 side panel on `cad.onshape.com`. It reads
+  did/wid/eid from the active tab URL and loads `http://localhost:5173/panel?doc=<url>`.
+- [ ] **D2 (by 19:00)** `/panel` route (compact, ~400 px wide), against the C1 sample fixture:
+  - prompt box
+  - "will change / will keep" list (`/api/inspect`)
+  - **step cards** (hypothesis, principle, prediction → result, verdict, lesson)
+  - prediction-accuracy sparkline
+  - notebook drawer
+  - final summary
+- [ ] **D3 (by 21:30)** Live against the backend during a real session.
+- [ ] **D4 (by 23:30)** Pitch v4 + Devpost draft from `docs/DIRECTION.md` (§8 demo, §9 pitch,
+  §10 tracks). Slides: problem, the loop, proof bench, path to production.
+- [ ] **D5 (by 04:30)** Fallback video from the final recording, kept on two laptops.
+
+## Part D: Checkpoints and cut lines
+
+| Checkpoint | Time | Pass |
+|---|---|---|
+| **CP-B** | Sat 16:00 | Contracts v1.2 frozen + sample investigation fixture; B.4 names frozen; **morph spike verdict** |
+| **CP-C** | Sat 18:00 | Investigator runs end to end in the terminal on the rear wing; rear-wing Part Studio exists |
+| **CP-D** | Sat 21:30 | Full loop inside Onshape: panel → session → step cards → the part morphs → versions |
+| **CP-E** | Sun 01:00 | Proof bench + ablation numbers; validation table; recordings |
+| **Rehearsal** | Sun 02:30 | Full 2-minute run, live and replay |
+| **Cutoff** | Sun 05:00 | Bug list only after this; tag `freeze` |
+
+**Cut lines (in order):**
+1. **Morph spike fails** → the panel's 3D viewer morphs from configured-export STLs (read-only;
+   already works); write to Onshape once at the end.
+2. **CP-C slips past 19:30** → drop the flap (fewer params); the fin becomes the demo backup.
+3. **CP-D slips past 23:00** → demo from the dashboard (not the extension) next to an Onshape tab.
+4. **CP-E slips** → drop the no-knowledge ablation; keep Darwin vs CMA-ES.
+
+**Never cut:** the step cards with prediction vs result, replay fallback, rehearsal, Devpost.
+
+## Part E: Schedule
+
+| Time | W-A | W-B | W-C | W-D |
+|---|---|---|---|---|
+| 14:45–16:00 | **A1 morph spike** | B1, start B2 | **C1 contracts** | D1 extension skeleton |
+| **16:00** | **CP-B** (15 min, all) | | | |
+| 16:00–18:00 | A2 wing Part Studio | B2 solver | C2 investigator | D2 panel on fixtures |
+| **18:00** | **CP-C**; dinner until 18:45 | | | |
+| 18:45–21:30 | A3, A4 | B3, B4 | C3, C4 | D2, D3 |
+| **21:30** | **CP-D** | | | |
+| 21:30–01:00 | Fin path; prod copy; recordings help | B5 | C5 bench | D4 pitch + Devpost |
+| **01:00** | **CP-E** | | | |
+| 01:00–02:30 | Fixes; C6 recordings; video v1 | | | |
+| **02:30** | **Rehearsal ×2** | | | |
+| 02:30–05:00 | Fix list only; D5 video; Devpost final | | | |
+| **05:00** | **Cutoff.** Sleep until 08:00 | | | |
+| 08:15–08:45 | **Submit Devpost** | | | |
+| 08:45–10:00 | Rehearsal ×3, Q&A drill | | | |
+| 10:30 | **Judging** | | | |
+
+**Tracks:** Overall, Most Technically Complex, Microsoft (primary), Anthropic. Factory Droid
+is a stretch only, if Droid can do real work in the running loop after 01:00. SpacetimeDB is
+dropped (no shared multi-user state to justify it).
+
+---
+
+# Archived: Weekend plan v3 (superseded by Plan v4 at Sat 14:45; history only)
 
 > **Read me first.** This is the build plan for the rest of the hackathon: four people and four Claude Code agents working in parallel.
-> - **Precedence.** For scope, ownership, contracts v2, schedule and checkpoints, **this plan wins**. Roadmap v2 (below) still defines the phases, the maturity levels and the **non-negotiable safety rules (its §3)**, and those rules bind every workstream. Contracts v1, fin physics and budgets come from the archived original plan.
+> - **Superseded by Plan v4 (top of file).** Kept as history. The precedence note below applied until Sat 14:45.
+> - **Precedence (historical).** For scope, ownership, contracts v2, schedule and checkpoints, **this plan won**. Roadmap v2 (below) still defines the phases, the maturity levels and the **non-negotiable safety rules (its §3)**, and those rules bind every workstream. Contracts v1, fin physics and budgets come from the archived original plan.
 > - **Agents read:** Part A, Part B, your own workstream in Part C, Part D, Part E, and the Part H items tagged with your workstream. Skip the other workstreams.
 > - **Contracts v2 are additive.** No v1 field is renamed or removed, so every existing recording still replays. After **CP5 (Sat 13:30)**, `shared/` is frozen again. Contract requests go in your folder's `CONTRACT_REQUESTS.md`, and W-C decides.
 > - Times are Pacific. **The hard new-feature cutoff is Sun 05:00.** Devpost is due by **08:45** (hard deadline 09:00). Judging is **10:30**.
-> - **This is the only schedule.** The "Submission scope" subsection that was added to Roadmap v2 §8 on Sat morning has been merged into this plan (Parts A.3, B.10 and D), and only a pointer remains there. If anything elsewhere in this file conflicts with Parts A–H, Parts A–H win.
+> - **(Historical) This was the only schedule.** The "Submission scope" subsection that was added to Roadmap v2 §8 on Sat morning has been merged into this plan (Parts A.3, B.10 and D), and only a pointer remains there. If anything elsewhere in this file conflicts with Parts A–H, Parts A–H win.
 
 ---
 
@@ -1050,8 +1298,9 @@ The submission scope added here on Sat Oct 24 (build past the original Sat 23:00
 freeze, more than one domain, a Sun 05:00 hard cutoff, no CFD, abort gates, and
 an honest-claim ladder) has been merged into **Weekend plan v3 at the top of this
 file**: Part A.3 (scope, no-CFD rule), Part B.10 (domains and the domain bar),
-and Part D (budget, cut lines/abort gates, claim ladder). Part E there is the
-only schedule. Do not re-add a schedule here.
+and Part D (budget, cut lines/abort gates, claim ladder). Both are now superseded
+by **Plan v4** at the top of this file, whose Part E is the only schedule. Do not
+re-add a schedule here.
 
 #### Phase 0 — finish and freeze the fin reference workflow
 
@@ -1360,8 +1609,8 @@ ships as inventory-only with a capability report, not as a scorer.
 
 The remainder of this document is the original fin-focused build plan. It is
 retained for decisions, contracts and historical rationale, but it is not the
-current implementation order. Weekend plan v3 at the top of this file is
-authoritative; Roadmap v2 defines the phases and safety rules.
+current implementation order. Plan v4 at the top of this file is authoritative;
+Roadmap v2 §3 still supplies the safety rules.
 
 > **Read me first.** This file is the single source of truth for four people and four Claude Code agents working in parallel.
 > - **Part B is the contract.** After checkpoint CP0 (Fri 20:30), `shared/` is **frozen**. No agent edits `shared/` or another section's folder. If a contract looks wrong, write the request in your own section's `CONTRACT_REQUESTS.md`, and the contract owner (S3) decides.
