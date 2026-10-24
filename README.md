@@ -1,27 +1,40 @@
 # Darwin
 
-Darwin turns an engineering goal into an explainable, simulation-backed, parametric CAD design:
+**Cursor for Onshape, for aerodynamic design.**
 
-`goal → propose → simulate → explain → regenerate CAD → repeat`
+Darwin turns a plain-English request into a sequence of small, testable design
+experiments. It reads the parameters of an existing Onshape model, states a
+physics-backed hypothesis, predicts what will change, runs an aerodynamic
+simulation, compares prediction with result, and either accepts or rejects the
+change. Accepted changes are written back to the parametric model; every step
+leaves an auditable reason and updates a lab notebook.
 
-The Cal Hacks demo optimizes a rocket fin against stability, drag, flutter safety, mass, and landing overhang. Every candidate is evaluated against the same physics model and evaluation budget as CMA-ES and random-search baselines. Winning geometry is regenerated from the team's Onshape model and can be exported as a print package.
+The simulator is a tool Darwin uses. The product is the reasoning loop between
+simulations.
 
-![Darwin architecture](docs/architecture.svg)
+## The demo
 
-## What the dashboard shows
+The hero object is an FSAE-style rear wing. A representative request is:
 
-- Natural-language goal interpretation with editable objectives, constraints, and assumptions.
-- A live fixed-topology fin preview that morphs between champions, then cross-fades to verified STL geometry.
-- Matched-budget agent, CMA-ES, and random-search curves.
-- Pareto landscape, evolutionary lineage, and parameter parallel coordinates.
-- An agent feed with proposals, critiques, strategy, fallbacks, timing, and cost.
-- Onshape, model-spend, and evaluation budget meters.
-- A winner card with before/after metrics, high-fidelity checks, print export, CAD commit, and report viewer.
-- Backend replay and a browser-only JSONL kiosk mode for an offline demo.
+> More downforce without going over 15 N of drag at 25 m/s. You can change the
+> angle, span, flap, and endplates. Keep the chord, mounts, and airfoil fixed.
 
-## Quick start
+For each step Darwin shows:
 
-Use Python 3.9 and Node 20.19 or newer.
+1. the lever it wants to test and the aerodynamic principle behind it;
+2. predicted ranges for downforce, drag, and relevant diagnostics;
+3. measured results from the solver, including induced/profile drag, stall
+   margin, span efficiency, Reynolds number, and the binding constraint;
+4. an accept, reject, or pivot decision made by deterministic code; and
+5. the lesson carried into the next step.
+
+The rear wing is the headline. The existing rocket-fin model is a second aero
+part and the project's origin story, not the primary demo.
+
+## Run the finished mock session
+
+The fixture-backed path needs no credentials or network. Use Python 3.9 and
+Node 20.19 or newer.
 
 ```bash
 python -m venv .venv
@@ -32,7 +45,7 @@ cd dashboard
 npm ci
 ```
 
-In two terminals from the repository root:
+Then, from the repository root, start the two processes in separate terminals:
 
 ```bash
 make mock
@@ -43,32 +56,75 @@ cd dashboard
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). The mock server streams the deterministic `shared/fixtures/sample_run.jsonl` recording and serves cached fixture STLs, so it requires no API keys or network.
+Open [http://localhost:5173/panel](http://localhost:5173/panel), then choose or
+load the preloaded finished session `session_fixture_wing`.
 
-For the real backend, source secrets from `~/.darwin_secrets.sh`, select component modes with the `DARWIN_*` environment variables documented in `.env.example`, and run `make dev` instead of `make mock`.
+That session is a deterministic **mock fixture** for panel development and
+rehearsal. It contains six steps, including rejection and pivot behavior, and
+finishes at +35% downforce, 14.87 N drag under a 15 N limit, and 0.89 running
+prediction accuracy. Those values demonstrate the interface contract; they are
+not proof-bench or live-solver results.
+
+To run the real backend, source the local secrets described in `.env.example`
+and use `make dev` instead of `make mock`. Never commit credentials or Onshape
+document IDs.
+
+## What is real, and what still needs final evidence
+
+- The v1.2 investigation contracts, event stream, rear-wing mock scorer, and
+  six-step fixture are in `shared/` and validate offline.
+- A live Onshape spike proved that updating a Variable feature changes an open
+  tab without refresh. The observed write took 0.47 seconds on a disposable fin
+  copy. This proves the write mechanism, not yet a complete rear-wing session.
+- Configured STL export is separately proven on the rocket-fin Part Studio.
+- The final rear-wing solver validation, end-to-end wing session, named
+  before/after versions, and production recording must be reported only after
+  their checked-in evidence lands.
+- `demo/bench_wing.json` is the required source for Darwin/CMA-ES/random/
+  no-knowledge comparisons. **TODO before submission:** replace this line with
+  the actual matched-budget result, or say the proof bench was not completed.
+
+## Architecture
+
+```text
+Onshape model + user request
+          |
+          v
+Chrome side panel  <---- REST + WebSocket ---->  FastAPI investigator
+                                                    |
+                           principles + notebook ---+--- aero solver
+                                                    |
+                                      guarded Variable-feature writes
+                                                    |
+                                                    v
+                                             Onshape versions
+```
+
+- `extension/` — Chrome Manifest V3 side-panel shell for `cad.onshape.com`.
+- `dashboard/` — compact `/panel` investigation UI and proof views.
+- `backend/` — prompt parsing, investigator loop, budgets, replay, and reports.
+- `sim/` — deterministic screening solvers and matched-budget baselines.
+- `domains/aero/` — cited aerodynamic principles used by the investigator.
+- `cad/` — guarded Onshape reads, writes, versioning, export, and call ledger.
+- `shared/` — Python/TypeScript contracts, fixtures, and the mock server.
+- `demo/` — recordings and benchmark outputs used as presentation evidence.
+- `docs/` — direction, physics notes, pitch, Devpost copy, and demo script.
 
 ## Verification
 
 ```bash
+make contracts
+make test
+
 cd dashboard
 npm test
 npm run build
-npm audit
+
+cd ..
+make secrets-check
 ```
 
-The S4 suite checks event ordering/deduplication, identical live/file-replay folding, reconnect behavior, and fin preview geometry against the frozen analytic volume and bounding-box formulas.
-
-## Repository map
-
-- `shared/` — frozen Python and TypeScript contracts, events, fixtures, and fakes.
-- `sim/` — deterministic aerodynamic, stability, flutter, mass, Pareto, and sensitivity scoring.
-- `backend/` — FastAPI orchestration, agent roles, baselines, recording, replay, and reports.
-- `cad/` — Onshape geometry, cache, budget ledger, commit, and print handoff when present.
-- `dashboard/` — React/TypeScript mission-control interface.
-- `docs/` — physics notes, pitch, demo script, and Devpost copy.
-
-## Honest scope
-
-Darwin is an optimization and trade-study tool, not a flight-safety certification system. Its fin model assumes subsonic, low-incidence flow, a rigid body, isotropic 100%-infill PLA, and a fixed reference rocket. See `sim/PHYSICS.md` for methods, validation, and limitations.
-
-No credentials, Onshape document IDs, or production recordings belong in Git. Run `make secrets-check` before sharing or submitting.
+See `sim/PHYSICS.md` for the applicable model's assumptions and validation.
+Darwin produces screening-level design guidance, not CFD, wind-tunnel evidence,
+or safety certification. Final hardware decisions still require appropriate
+high-fidelity analysis and physical validation.
