@@ -1,0 +1,12 @@
+# Darwin — one pinned set for the whole team. Python 3.9 (see PLAN.md Part A).
+# Sections may add extras in <section>/requirements.txt; install with  pip install -r <section>/requirements.txt
+pydantic>=2.7,<3
+fastapi>=0.110,<0.116
+uvicorn[standard]>=0.29,<0.33
+anthropic<1                 # SDK 1.x requires Python >= 3.10
+cma>=3.3,<4
+numpy<2.1
+requests>=2.31
+aerosandbox==4.2.8
+pytest>=8
+httpx>=0.27

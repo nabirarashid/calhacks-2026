@@ -1,0 +1,23 @@
+{
+  "onshape": {
+    "account_label": "prod",
+    "calls_session": 7,
+    "calls_ledger_total": 212,
+    "remaining_estimate": 2188,
+    "reserve": 400,
+    "reserve_unlocked": false,
+    "hard_stop": false,
+    "last_synced_at": "2026-10-24T09:05:00-07:00"
+  },
+  "model": {
+    "provider": "anthropic",
+    "calls_run": 14,
+    "calls_cap_run": 40,
+    "spend_run_usd": 0.021,
+    "spend_cap_run_usd": 0.3,
+    "spend_total_usd": 0.84,
+    "spend_cap_total_usd": 4.5
+  },
+  "evals_used": 40,
+  "evals_budget": 64
+}

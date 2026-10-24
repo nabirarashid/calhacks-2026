@@ -1,0 +1,66 @@
+{
+  "source_text": "Maximize this rocket fin's stability, keep drag low, keep it under 40 g, must fit a 3-inch body tube.",
+  "objectives": [
+    {
+      "metric": "stability_margin_cal",
+      "direction": "target",
+      "target": 2.5,
+      "tolerance": 1.0,
+      "weight": 0.5
+    },
+    {
+      "metric": "drag_n",
+      "direction": "minimize",
+      "target": null,
+      "tolerance": null,
+      "weight": 0.35
+    },
+    {
+      "metric": "fin_mass_total_g",
+      "direction": "minimize",
+      "target": null,
+      "tolerance": null,
+      "weight": 0.15
+    }
+  ],
+  "constraints": [
+    {
+      "ref": "fin_mass_total_g",
+      "op": "<=",
+      "value": 40.0,
+      "hard": true,
+      "label": "total fin mass <= 40 g"
+    },
+    {
+      "ref": "flutter_margin",
+      "op": ">=",
+      "value": 1.5,
+      "hard": true,
+      "label": "flutter-safe (default)"
+    },
+    {
+      "ref": "stability_margin_cal",
+      "op": ">=",
+      "value": 1.0,
+      "hard": true,
+      "label": "stable (default)"
+    },
+    {
+      "ref": "aft_overhang_mm",
+      "op": "<=",
+      "value": 0.0,
+      "hard": false,
+      "label": "no aft overhang"
+    }
+  ],
+  "fixed_params": {},
+  "context_overrides": {
+    "body_diameter_mm": 76.2
+  },
+  "assumptions": [
+    "'Maximize stability' -> target 2.5 cal: beyond ~3 cal a rocket weathercocks",
+    "'under 40 g' read as the TOTAL for all fins",
+    "3-inch tube = 76.2 mm body diameter"
+  ],
+  "parsed_by": "llm"
+}

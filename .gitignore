@@ -1,0 +1,35 @@
+# --- secrets (keys live in ~/.darwin_secrets.sh, outside the repo) ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# --- runtime caches (may contain account data) ---
+.darwin/
+cad/SPIKE_raw/
+
+# --- geometry / media ---
+*.stl
+!demo/geometry/*.stl
+!shared/fixtures/*.stl
+!cad/tests/fixtures/*.stl
+demo/video/*.mp4
+demo/video/*.mov
+
+# --- python ---
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+*.egg-info/
+
+# --- node ---
+node_modules/
+dist/
+.vite/
+
+# --- os / editors ---
+.DS_Store
+.vscode/
+.idea/

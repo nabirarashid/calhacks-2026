@@ -1,0 +1,27 @@
+{
+  "metrics": {
+    "stability_margin_cal": 2.31,
+    "cp_mm": 1031.0,
+    "cg_mm": 855.0,
+    "drag_n": 1.31,
+    "cd_fins": 0.058,
+    "fin_mass_g": 10.8,
+    "fin_mass_total_g": 32.4,
+    "flutter_velocity_mps": 205.0,
+    "flutter_margin": 1.71,
+    "cn_alpha_fins": 8.9,
+    "aft_overhang_mm": 0.0,
+    "planform_area_cm2": 41.35
+  },
+  "objective_scores": {
+    "stability_margin_cal": 0.81,
+    "drag_n": 0.74,
+    "fin_mass_total_g": 0.38
+  },
+  "violations": [],
+  "feasible": true,
+  "aggregate": 0.722,
+  "warnings": [],
+  "fidelity": "fast",
+  "eval_ms": 14.2
+}

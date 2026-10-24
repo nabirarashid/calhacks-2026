@@ -1,0 +1,124 @@
+{
+  "id": "fin_v1",
+  "name": "Trapezoidal rocket fin",
+  "scorer": "fin_v1",
+  "parameters": [
+    {
+      "name": "root_chord",
+      "kind": "continuous",
+      "unit": "mm",
+      "min": 50.0,
+      "max": 130.0,
+      "step": 0.5,
+      "choices": null,
+      "default": 90.0,
+      "cad_driven": true,
+      "cad_ref": "root_chord",
+      "description": "Chord at the body tube"
+    },
+    {
+      "name": "taper_ratio",
+      "kind": "continuous",
+      "unit": "",
+      "min": 0.2,
+      "max": 1.0,
+      "step": 0.01,
+      "choices": null,
+      "default": 0.5,
+      "cad_driven": true,
+      "cad_ref": "taper_ratio",
+      "description": "Tip chord / root chord"
+    },
+    {
+      "name": "semi_span",
+      "kind": "continuous",
+      "unit": "mm",
+      "min": 30.0,
+      "max": 90.0,
+      "step": 0.5,
+      "choices": null,
+      "default": 60.0,
+      "cad_driven": true,
+      "cad_ref": "semi_span",
+      "description": "Fin height from the body tube"
+    },
+    {
+      "name": "sweep_deg",
+      "kind": "continuous",
+      "unit": "deg",
+      "min": 0.0,
+      "max": 60.0,
+      "step": 0.5,
+      "choices": null,
+      "default": 30.0,
+      "cad_driven": true,
+      "cad_ref": "sweep_deg",
+      "description": "Leading-edge sweep angle"
+    },
+    {
+      "name": "thickness",
+      "kind": "continuous",
+      "unit": "mm",
+      "min": 2.0,
+      "max": 5.0,
+      "step": 0.1,
+      "choices": null,
+      "default": 3.0,
+      "cad_driven": true,
+      "cad_ref": "thickness",
+      "description": "Plate thickness"
+    },
+    {
+      "name": "edge_profile",
+      "kind": "choice",
+      "unit": "",
+      "min": null,
+      "max": null,
+      "step": null,
+      "choices": [
+        "square",
+        "rounded",
+        "beveled"
+      ],
+      "default": "rounded",
+      "cad_driven": true,
+      "cad_ref": "edge_profile",
+      "description": "Leading/trailing edge treatment"
+    },
+    {
+      "name": "fin_count",
+      "kind": "integer",
+      "unit": "",
+      "min": 3.0,
+      "max": 4.0,
+      "step": 1.0,
+      "choices": null,
+      "default": 4,
+      "cad_driven": false,
+      "cad_ref": null,
+      "description": "Fins on the rocket (sim-only)"
+    }
+  ],
+  "context": {
+    "body_diameter_mm": 76.2,
+    "body_length_mm": 1200.0,
+    "nose_length_mm": 300.0,
+    "nose_shape": "ogive",
+    "mass_without_fins_g": 1500.0,
+    "cg_without_fins_mm": 700.0,
+    "design_velocity_mps": 120.0,
+    "altitude_m": 0.0,
+    "alpha_deg": 2.0,
+    "material": "PLA",
+    "density_g_cm3": 1.24,
+    "shear_modulus_gpa": 1.3
+  },
+  "source": {
+    "kind": "onshape",
+    "doc_url": null,
+    "mode": "configuration",
+    "model_revision": "r1"
+  },
+  "discovered": false,
+  "notes": []
+}

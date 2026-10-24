@@ -1,0 +1,75 @@
+{
+  "design_id": "run_0712_3fa9-g03-a05",
+  "run_id": "run_0712_3fa9",
+  "generation": 3,
+  "origin": "agent",
+  "params": {
+    "root_chord": 92.0,
+    "taper_ratio": 0.45,
+    "semi_span": 62.0,
+    "sweep_deg": 38.0,
+    "thickness": 2.4,
+    "edge_profile": "beveled",
+    "fin_count": 3
+  },
+  "param_hash": "37daeb0cb5d1",
+  "parent_ids": [
+    "run_0712_3fa9-g02-a01",
+    "run_0712_3fa9-g02-a04"
+  ],
+  "operator": "crossover",
+  "rationale": "Take g02-a01's sweep (CP aft) with g02-a04's thin beveled section to cut mass; 3 fins keep total < 40 g.",
+  "score": {
+    "metrics": {
+      "stability_margin_cal": 2.31,
+      "cp_mm": 1031.0,
+      "cg_mm": 855.0,
+      "drag_n": 1.31,
+      "cd_fins": 0.058,
+      "fin_mass_g": 10.8,
+      "fin_mass_total_g": 32.4,
+      "flutter_velocity_mps": 205.0,
+      "flutter_margin": 1.71,
+      "cn_alpha_fins": 8.9,
+      "aft_overhang_mm": 0.0,
+      "planform_area_cm2": 41.35
+    },
+    "objective_scores": {
+      "stability_margin_cal": 0.81,
+      "drag_n": 0.74,
+      "fin_mass_total_g": 0.38
+    },
+    "violations": [],
+    "feasible": true,
+    "aggregate": 0.722,
+    "warnings": [],
+    "fidelity": "fast",
+    "eval_ms": 14.2
+  },
+  "pareto_rank": 0,
+  "geometry": {
+    "geometry_key": "3a80c4068fbf",
+    "status": "ready",
+    "source": "onshape_config",
+    "stl_url": "/api/geometry/3a80c4068fbf.stl",
+    "bbox_mm": [
+      0.0,
+      -1.2,
+      0.0,
+      92.0,
+      1.2,
+      62.0
+    ],
+    "volume_mm3": 8709.2,
+    "triangles": 412,
+    "onshape_calls": 1,
+    "regen_status": "OK",
+    "error": null,
+    "elapsed_ms": 1710.0
+  },
+  "timings_ms": {
+    "propose": 2900.0,
+    "eval": 14.2,
+    "geometry": 1710.0
+  }
+}

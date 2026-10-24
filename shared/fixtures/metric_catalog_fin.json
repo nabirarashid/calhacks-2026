@@ -1,0 +1,122 @@
+[
+  {
+    "name": "stability_margin_cal",
+    "unit": "cal",
+    "description": "(CP - CG) / body diameter, CG including fin mass",
+    "better": "target",
+    "typical_min": 0.0,
+    "typical_max": 4.0,
+    "default_tolerance": 0.75,
+    "default_target": 2.0
+  },
+  {
+    "name": "cp_mm",
+    "unit": "mm",
+    "description": "Barrowman center of pressure from the nose tip",
+    "better": "info",
+    "typical_min": 800.0,
+    "typical_max": 1150.0,
+    "default_tolerance": null,
+    "default_target": null
+  },
+  {
+    "name": "cg_mm",
+    "unit": "mm",
+    "description": "Center of gravity from the nose tip, including fins",
+    "better": "info",
+    "typical_min": 650.0,
+    "typical_max": 900.0,
+    "default_tolerance": null,
+    "default_target": null
+  },
+  {
+    "name": "drag_n",
+    "unit": "N",
+    "description": "Fin-set drag at design velocity (all fins)",
+    "better": "lower",
+    "typical_min": 0.2,
+    "typical_max": 4.0,
+    "default_tolerance": null,
+    "default_target": null
+  },
+  {
+    "name": "cd_fins",
+    "unit": "",
+    "description": "Fin-set drag coefficient referenced to body cross-section",
+    "better": "lower",
+    "typical_min": 0.01,
+    "typical_max": 0.25,
+    "default_tolerance": null,
+    "default_target": null
+  },
+  {
+    "name": "fin_mass_g",
+    "unit": "g",
+    "description": "Mass of one fin, solid PLA",
+    "better": "lower",
+    "typical_min": 3.0,
+    "typical_max": 50.0,
+    "default_tolerance": null,
+    "default_target": null
+  },
+  {
+    "name": "fin_mass_total_g",
+    "unit": "g",
+    "description": "Mass of all fins",
+    "better": "lower",
+    "typical_min": 10.0,
+    "typical_max": 200.0,
+    "default_tolerance": null,
+    "default_target": null
+  },
+  {
+    "name": "flutter_velocity_mps",
+    "unit": "m/s",
+    "description": "NACA TN 4197-style flutter boundary (screening estimate)",
+    "better": "higher",
+    "typical_min": 50.0,
+    "typical_max": 600.0,
+    "default_tolerance": null,
+    "default_target": null
+  },
+  {
+    "name": "flutter_margin",
+    "unit": "",
+    "description": "Flutter velocity / design velocity",
+    "better": "higher",
+    "typical_min": 0.5,
+    "typical_max": 5.0,
+    "default_tolerance": null,
+    "default_target": null
+  },
+  {
+    "name": "cn_alpha_fins",
+    "unit": "1/rad",
+    "description": "Barrowman fin normal-force slope with body interference",
+    "better": "info",
+    "typical_min": 2.0,
+    "typical_max": 20.0,
+    "default_tolerance": null,
+    "default_target": null
+  },
+  {
+    "name": "aft_overhang_mm",
+    "unit": "mm",
+    "description": "Tip trailing edge behind the root trailing edge",
+    "better": "lower",
+    "typical_min": 0.0,
+    "typical_max": 80.0,
+    "default_tolerance": null,
+    "default_target": null
+  },
+  {
+    "name": "planform_area_cm2",
+    "unit": "cm^2",
+    "description": "Planform area of one fin",
+    "better": "info",
+    "typical_min": 10.0,
+    "typical_max": 110.0,
+    "default_tolerance": null,
+    "default_target": null
+  }
+]
