@@ -32,6 +32,7 @@ _SCORERS = {}  # type: Dict[str, object]
 # else — so it can be evaluated, but never in a spawned worker.
 _BUILTIN_SCORERS = {
     "fin_v1": "sim.plugins.fin_v1",
+    "rear_wing_v1": "sim.plugins.rear_wing_v1",
 }  # type: Dict[str, str]
 
 

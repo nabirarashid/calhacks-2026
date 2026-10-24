@@ -246,27 +246,45 @@ class Notebook(BaseModel):
 - `drag_induced_n`, `drag_profile_n`
 - `cl`, `stall_margin_deg`, `span_efficiency`, `aspect_ratio_eff`, `reynolds`
 
-**FROZEN Sat 15:15 by W-B (B1).** Names, units and ranges above are final; changes now go
+**FROZEN Sat 15:01 by W-B (B1).** Names, units and ranges above are final; changes now go
 through `sim/CONTRACT_REQUESTS.md`. **The demo goal uses `downforce_n` (maximize) and
 `drag_n` (≤ limit).**
 
-Verified before freezing (`sim/PHYSICS.md` will carry the full numbers):
-- **All 64 corners of the six ranges evaluate**, 0 failures, worst 17.5 ms including the
-  stall sweep (budget 100 ms).
-- **Modelling note — the flap is a hinged trailing-edge surface on one NACA 4412 section,
-  not a second lifting surface.** Tested both at the default (AoA 6°, flap 15°): as two
-  isolated surfaces the flap sits at 21° local incidence, stalls, and adds only **+4 %**
-  downforce while its drag climbs, which would teach the agent that the flap is useless. As a
-  hinged flap NeuralFoil sees the deflected section and the flap adds **+67 %** downforce,
-  plateauing by 30°, which is how a race-car flap behaves. The slot/gap effect of a real
-  two-element wing is not modelled, so maximum downforce is **conservative** (plain flaps
-  separate earlier than slotted ones).
-- **`stall_margin_deg` = section stall angle − `aoa_deg`.** The stall angle is where
-  NeuralFoil's CL peaks for the deflected section at the run's Reynolds number: 13.5° clean,
-  9.5° at 15° flap, 5.5° at 35° (Re ≈ 4.8×10⁵). The default design has **+3.5°** margin;
-  negative margin is treated as infeasible by the loop.
-- **Inverted wing:** solved as a NACA 4412 at positive AoA and reported as downforce. With no
-  ground effect modelled the two are mirror images, so this is exact within the model.
+**The model (`sim/plugins/rear_wing_v1.py`, W-B B2; full numbers in `sim/PHYSICS.md`).**
+The plan's fast path was AeroBuildup; it was measured and replaced for lift, because each
+step below was checked against an independent reference first:
+
+| Quantity | Source | Checked against |
+|---|---|---|
+| Lift (camber + flap) | **VLM**, one full-chord lattice with the flap deflected in the airfoil geometry | Helmbold low-AR theory ~4 %; Glauert flap theory 2–4 % to 20° |
+| Viscous lift loss | **NeuralFoil** viscous/inviscid ratio of the flapped section | turns the flap over: ratio 1.0 at 10°, 0.78 at 20°, 0.54 at 35° |
+| Span efficiency | **Prandtl lifting line** (Glauert) | Anderson's rectangular-wing curve; converged in stations |
+| Endplates | **Hoerner** `AR_eff = AR(1 + 1.9 h/b)` | lift slope and induced drag both corrected |
+| Profile drag, stall | **NeuralFoil**, deflected section, effective angle | Abbott & von Doenhoff NACA 4412 bands |
+
+Why AeroBuildup lost the lift job, and two traps found on the way:
+- **AeroBuildup over-predicts camber lift on this AR-3 wing by 27–74 %** (worst at low AoA,
+  where it reports nearly the 2D section value; theory and VLM agree with each other). Its
+  slope is right; the offset is not. The flap is extra camber, so flap effectiveness was
+  inflated ~50 % at small angles.
+- **AeroSandbox 4.2.8's VLM ignores `ControlSurface` deflection** (identical CL at 0/15/30°).
+  Deflecting the flap in the airfoil coordinates avoids it.
+- **Two lattices, each with its own 4412 camber, is a double-humped section**, −25 % lift at
+  flap 0. One lattice with the true camber line fixes it.
+
+Behaviour the agent will meet (all in the golden tests, `sim/tests/test_rear_wing.py`):
+- **Flap has an interior optimum near 20°** (the plain-flap ceiling: no slot is modelled, so
+  maximum downforce is conservative). Past it, downforce falls while drag keeps rising.
+- **AoA raises downforce until stall, then it falls.** `stall_margin_deg` = NeuralFoil
+  section stall angle − `aoa_deg` (13.5° clean, 9.5° at 15° flap); the default has **+3.5°**.
+- **Span cuts induced drag per newton of downforce**, not raw induced drag (with chord fixed,
+  area and AR grow together and cancel at fixed CL).
+- **Headroom:** under a 20 N drag cap the best design in a 300-sample LHS makes **146 N vs
+  105 N at the default (+39 %)**.
+- 64/64 range corners evaluate; ~18 ms per fast evaluation; `hifi` is the same model at a
+  converged VLM resolution, so it doubles as a mesh-refinement check (−1.7 %).
+- **Inverted wing:** solved upright and reported as downforce; exact within the model, since
+  no ground effect is modelled.
 
 ### B.6 Session API (owner W-C)
 
