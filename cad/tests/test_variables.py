@@ -9,6 +9,7 @@ import pytest
 from cad import variables
 
 FIX = json.loads((Path(__file__).parent / "fixtures" / "features_wing.json").read_text())
+NESTED_FIX = json.loads((Path(__file__).parent / "fixtures" / "features_wing_nested.json").read_text())
 URL = "https://cad.onshape.com/documents/d0c/w/w0r/e/e1e"
 UNITS = {"aoa_deg": "deg", "span_mm": "mm", "chord_mm": "mm", "flap_angle_deg": "deg", "flap_chord_frac": "",
          "endplate_height_mm": "mm"}
@@ -91,6 +92,42 @@ def test_parse_real_format():
         ("ANGLE", "angleValue", 6.0, "deg")
     assert (v["flap_chord_frac"]["type"], v["flap_chord_frac"]["unit"]) == ("NUMBER", "")
     assert variables.parse_literal("#a * 2") == (None, "")
+
+
+def test_parse_nested_feature_and_parameter_wrappers():
+    parsed = variables.parse_variables(NESTED_FIX)
+    assert set(parsed) == {"aoa_deg", "span_mm"}
+    assert parsed["aoa_deg"]["feature_id"] == "fixture-aoa-feature"
+    assert parsed["aoa_deg"]["expression"] == "6 deg"
+    assert parsed["span_mm"]["value"] == 850.0
+
+
+@pytest.mark.parametrize("name,value,unit,variable_type,parameter_id,expression", [
+    ("span_mm", 850, "mm", "LENGTH", "lengthValue", "850 mm"),
+    ("aoa_deg", 6, "deg", "ANGLE", "angleValue", "6 deg"),
+    ("flap_chord_frac", 0.3, "", "NUMBER", "numberValue", "0.3"),
+])
+def test_build_variable_feature_uses_post_schema(
+        name, value, unit, variable_type, parameter_id, expression):
+    payload = variables.build_variable_feature(name, value, unit)
+    assert payload["btType"] == "BTFeatureDefinitionCall-1406"
+    feature = payload["feature"]
+    params = {row["parameterId"]: row for row in feature["parameters"]}
+    assert params["name"]["value"] == name
+    assert params["variableType"]["value"] == variable_type
+    assert params[parameter_id]["expression"] == expression
+    assert params[parameter_id]["isInteger"] is False
+    assert all("message" not in row for row in feature["parameters"])
+
+
+@pytest.mark.parametrize("name,value,unit", [
+    ("bad name", 1, "mm"), ("9bad", 1, "mm"),
+    ("span_mm", float("nan"), "mm"), ("span_mm", True, "mm"),
+    ("span_mm", 1, "cm"),
+])
+def test_build_variable_feature_rejects_unsafe_inputs(name, value, unit):
+    with pytest.raises(ValueError):
+        variables.build_variable_feature(name, value, unit)
 
 
 def test_apply_writes_only_changed_variables_and_verifies(cad):

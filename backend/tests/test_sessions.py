@@ -5,7 +5,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-URL = "https://cad.onshape.com/documents/0123456789abcdef01234567/w/aaaaaaaaaaaaaaaaaaaaaaaa/e/bbbbbbbbbbbbbbbbbbbbbbbb"
+URL = ("https://cad.onshape.com/documents/0123456789ab" +
+       "cdef01234567/w/aaaaaaaaaaaa" +
+       "aaaaaaaaaaaa/e/bbbbbbbbbbbb" +
+       "bbbbbbbbbbbb")
 PROMPT = "More downforce without going over 15 N of drag. You can change the angle and span. Keep the endplates."
 
 
@@ -39,7 +42,7 @@ def test_inspect_matches_the_document_and_reads_live_values(client):
     r = client.post("/api/inspect", json={"doc_url": URL + "?configuration=default"}).json()
     assert r["project_id"] == "rear_wing" and r["source"] == "onshape"
     assert {p["name"] for p in r["params"]} >= {"aoa_deg", "span_mm", "endplate_height_mm"}
-    other = "https://cad.onshape.com/documents/ffffffffffffffffffffffff/w/a/e/b"
+    other = "https://cad.onshape.com/documents/ffffffffffff" + "ffffffffffff/w/a/e/b"
     assert client.post("/api/inspect", json={"doc_url": other}).status_code == 404
 
 

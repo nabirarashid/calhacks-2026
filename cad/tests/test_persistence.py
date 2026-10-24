@@ -8,12 +8,13 @@ import json
 import pytest
 
 from cad import api as cad_api
-from cad.api import commit_to_document
+from cad.api import commit_to_document, preview_commit
 from cad import cache
 from cad.ledger import Ledger
 from cad.onshape_client import OnshapeClient, build_configuration_update
 from shared import fin_geometry
-from shared.contracts import CadSource, DesignSpace, ParamSpec
+from domains.rocket_fin.verifier import FinGeometryVerifier
+from shared.contracts import CadSource, DesignSpace, GeometryRef, ParamSpec
 
 
 class FakeResponse(object):
@@ -234,20 +235,22 @@ def test_commit_sequence_verifies_values_geometry_then_versions(monkeypatch, tmp
     after["sourceMicroversion"] = "after"
     stl_text = fin_geometry.prism_stl(params)
     api, session, ledger = client(tmp_path, [
-        FakeResponse(before), FakeResponse(after), FakeResponse(after),
+        FakeResponse(before), FakeResponse({"id": "pre-version"}),
+        FakeResponse(after), FakeResponse(after),
         FakeResponse({}, text=stl_text), FakeResponse({"id": "version-id"}),
     ])
     monkeypatch.setattr(cad_api, "_ledger", ledger)
     monkeypatch.setattr(cad_api, "_client", api)
     monkeypatch.setattr(cache, "store", lambda ref, text: ref)
 
-    ref = commit_to_document(fin_space(), params)
+    ref = commit_to_document(fin_space(), params, verifier=FinGeometryVerifier())
 
     assert ref.status == "ready"
     assert ref.regen_status == "OK"
-    assert ref.onshape_calls == 5
-    assert [call["method"] for call in session.calls] == ["GET", "POST", "GET", "GET", "POST"]
-    assert session.calls[1]["json"]["btType"] == "BTConfigurationUpdateCall-2933"
+    assert ref.onshape_calls == 6
+    assert [call["method"] for call in session.calls] == ["GET", "POST", "POST", "GET", "GET", "POST"]
+    assert session.calls[2]["json"]["btType"] == "BTConfigurationUpdateCall-2933"
+    assert session.calls[1]["json"]["name"].startswith("darwin-pre-")
     assert session.calls[-1]["json"]["name"].startswith("Darwin verified ")
 
 
@@ -257,9 +260,261 @@ def test_commit_stops_before_post_when_cad_parameter_is_missing(monkeypatch, tmp
     monkeypatch.setattr(cad_api, "_ledger", ledger)
     monkeypatch.setattr(cad_api, "_client", api)
 
-    ref = commit_to_document(fin_space(include_edge_profile=True), champion_params())
+    ref = commit_to_document(fin_space(include_edge_profile=True), champion_params(),
+                             verifier=FinGeometryVerifier())
 
     assert ref.status == "failed"
     assert ref.regen_status == "NOT_ATTEMPTED"
     assert "edge_profile" in ref.error
+    assert [call["method"] for call in session.calls] == ["GET"]
+
+
+def test_preview_commit_redacts_target_and_caches_configuration(monkeypatch, tmp_path):
+    api, session, ledger = client(tmp_path, [FakeResponse(config_snapshot())])
+    monkeypatch.setattr(cad_api, "_ledger", ledger)
+    monkeypatch.setattr(cad_api, "_client", api)
+    cad_api._configuration_cache.clear()
+
+    preview = preview_commit(fin_space(), champion_params())
+    again = preview_commit(fin_space(), champion_params())
+
+    assert preview["target"] == "Fin persistence test"
+    assert preview["expected_calls"] == 1
+    assert preview["param_diff"]["root_chord"] == {"from": 90.0, "to": 92.0}
+    assert again["expected_calls"] == 0
+    assert "doc" not in repr(preview)
+    assert len(session.calls) == 1
+
+
+def test_commit_restores_snapshot_after_post_write_failure(monkeypatch, tmp_path):
+    enable_write(monkeypatch)
+    before = config_snapshot("before")
+    changed = build_configuration_update(before, {
+        "root_chord": 92.0, "taper_ratio": 0.55, "semi_span": 62.0,
+        "sweep_deg": 32.0, "thickness": 3.2,
+    })
+    changed["sourceMicroversion"] = "changed"
+    restored = config_snapshot("restored")
+    api, session, ledger = client(tmp_path, [
+        FakeResponse(before), FakeResponse({"id": "pre-version"}),
+        FakeResponse(changed), FakeResponse(changed),
+        FakeResponse({}, text="not an STL"), FakeResponse(changed),
+        FakeResponse({}), FakeResponse(restored),
+    ])
+    monkeypatch.setattr(cad_api, "_ledger", ledger)
+    monkeypatch.setattr(cad_api, "_client", api)
+
+    ref = commit_to_document(fin_space(), champion_params(), verifier=FinGeometryVerifier())
+
+    assert ref.status == "failed"
+    assert ref.regen_status == "ERROR"
+    assert "pre-write configuration restored" in ref.error
+    assert [call["method"] for call in session.calls] == [
+        "GET", "POST", "POST", "GET", "GET", "GET", "POST", "GET"]
+    assert session.calls[6]["json"]["currentConfiguration"][0]["value"] == 90.0
+
+
+def test_commit_reports_manual_recovery_when_restore_fails(monkeypatch, tmp_path):
+    enable_write(monkeypatch)
+    before = config_snapshot("before")
+    changed = build_configuration_update(before, {
+        "root_chord": 92.0, "taper_ratio": 0.55, "semi_span": 62.0,
+        "sweep_deg": 32.0, "thickness": 3.2,
+    })
+    changed["sourceMicroversion"] = "changed"
+    api, session, ledger = client(tmp_path, [
+        FakeResponse(before), FakeResponse({"id": "pre-version"}),
+        FakeResponse(changed), FakeResponse(changed),
+        FakeResponse(changed), FakeResponse({}, status_code=500),
+    ])
+    monkeypatch.setattr(cad_api, "_ledger", ledger)
+    monkeypatch.setattr(cad_api, "_client", api)
+
+    ref = commit_to_document(fin_space(), champion_params(), verifier=FinGeometryVerifier())
+
+    assert ref.status == "failed"
+    assert ref.regen_status == "PARTIAL_WRITE"
+    assert "version graph" in ref.error
+    assert "darwin-pre-" in ref.error
+
+
+def test_update_http_failure_is_treated_as_possibly_applied_and_restored(monkeypatch, tmp_path):
+    """A failed POST response cannot prove the server did not apply the write."""
+    enable_write(monkeypatch)
+    before = config_snapshot("before")
+    changed = build_configuration_update(before, {
+        "root_chord": 92.0, "taper_ratio": 0.55, "semi_span": 62.0,
+        "sweep_deg": 32.0, "thickness": 3.2,
+    })
+    changed["sourceMicroversion"] = "changed"
+    restored = config_snapshot("restored")
+    api, session, ledger = client(tmp_path, [
+        FakeResponse(before), FakeResponse({"id": "pre-version"}),
+        FakeResponse({}, status_code=500),  # ambiguous POST outcome
+        FakeResponse(changed), FakeResponse({}), FakeResponse(restored),
+    ])
+    monkeypatch.setattr(cad_api, "_ledger", ledger)
+    monkeypatch.setattr(cad_api, "_client", api)
+
+    ref = commit_to_document(fin_space(), champion_params(), verifier=FinGeometryVerifier())
+
+    assert ref.status == "failed"
+    assert ref.regen_status == "ERROR"
+    assert "pre-write configuration restored" in ref.error
+    assert [call["method"] for call in session.calls] == [
+        "GET", "POST", "POST", "GET", "POST", "GET"]
+    assert session.calls[4]["json"]["currentConfiguration"][0]["value"] == 90.0
+
+
+def test_final_version_failure_restores_verified_configuration(monkeypatch, tmp_path):
+    enable_write(monkeypatch)
+    params = champion_params()
+    before = config_snapshot("before")
+    after = build_configuration_update(before, {
+        key: value for key, value in params.items() if key != "edge_profile"
+    })
+    after["btType"] = "BTConfigurationResponse-2019"
+    after["sourceMicroversion"] = "after"
+    restored = config_snapshot("restored")
+    api, session, ledger = client(tmp_path, [
+        FakeResponse(before), FakeResponse({"id": "pre-version"}),
+        FakeResponse(after), FakeResponse(after),
+        FakeResponse({}, text=fin_geometry.prism_stl(params)),
+        FakeResponse({}, status_code=500),  # final version request
+        FakeResponse(after), FakeResponse({}), FakeResponse(restored),
+    ])
+    monkeypatch.setattr(cad_api, "_ledger", ledger)
+    monkeypatch.setattr(cad_api, "_client", api)
+
+    ref = commit_to_document(fin_space(), params, verifier=FinGeometryVerifier())
+
+    assert ref.status == "failed"
+    assert ref.regen_status == "ERROR"
+    assert "pre-write configuration restored" in ref.error
+    assert [call["method"] for call in session.calls] == [
+        "GET", "POST", "POST", "GET", "GET", "POST", "GET", "POST", "GET"]
+
+
+def test_budget_refusal_at_update_sends_no_write_and_skips_recovery(monkeypatch, tmp_path):
+    enable_write(monkeypatch)
+    before = config_snapshot("before")
+    api, session, ledger = client(tmp_path, [
+        FakeResponse(before), FakeResponse({"id": "pre-version"}),
+    ])
+    # The preflight GET and recovery checkpoint fit; the write POST is refused
+    # by the ledger before it reaches the mocked HTTP session.
+    ledger.calls_remaining = 2
+    monkeypatch.setattr(cad_api, "_ledger", ledger)
+    monkeypatch.setattr(cad_api, "_client", api)
+
+    ref = commit_to_document(fin_space(), champion_params(), verifier=FinGeometryVerifier())
+
+    assert ref.status == "failed"
+    assert ref.regen_status == "NOT_ATTEMPTED"
+    assert "onshape_budget_reserve" in ref.error
+    assert [call["method"] for call in session.calls] == ["GET", "POST"]
+
+
+def test_budget_exhaustion_after_update_reports_partial_write_and_manual_recovery(
+        monkeypatch, tmp_path):
+    enable_write(monkeypatch)
+    before = config_snapshot("before")
+    changed = build_configuration_update(before, {
+        "root_chord": 92.0, "taper_ratio": 0.55, "semi_span": 62.0,
+        "sweep_deg": 32.0, "thickness": 3.2,
+    })
+    changed["sourceMicroversion"] = "changed"
+    api, session, ledger = client(tmp_path, [
+        FakeResponse(before), FakeResponse({"id": "pre-version"}),
+        FakeResponse(changed),
+    ])
+    # Snapshot, checkpoint version, and update fit; the verification GET and
+    # subsequent recovery calls are refused before HTTP dispatch.
+    ledger.calls_remaining = 3
+    monkeypatch.setattr(cad_api, "_ledger", ledger)
+    monkeypatch.setattr(cad_api, "_client", api)
+
+    ref = commit_to_document(fin_space(), champion_params(), verifier=FinGeometryVerifier())
+
+    assert ref.status == "failed"
+    assert ref.regen_status == "PARTIAL_WRITE"
+    assert "MANUAL RECOVERY REQUIRED" in ref.error
+    assert "darwin-pre-" in ref.error
+    assert [call["method"] for call in session.calls] == ["GET", "POST", "POST"]
+
+
+def test_cached_geometry_is_reverified_with_current_domain_verifier(monkeypatch, tmp_path):
+    params = champion_params()
+    path = tmp_path / "cached.stl"
+    path.write_text(fin_geometry.prism_stl(params))
+    monkeypatch.setattr(cache, "load", lambda key: GeometryRef(
+        geometry_key=key, status="ready", source="cache"))
+    monkeypatch.setattr(cache, "stl_path", lambda key: str(path))
+
+    class RejectingVerifier(object):
+        def verify_data(self, _params, _stl):
+            return {"ok": False, "reasons": ["current policy rejects cached mesh"]}
+
+    ref = cad_api.build_geometry(fin_space(), params, verifier=RejectingVerifier())
+
+    assert ref.source == "cache"
+    assert ref.status == "failed"
+    assert ref.regen_status == "SANITY_FAIL"
+    assert "current policy rejects cached mesh" in ref.error
+    assert ref.onshape_calls == 0
+
+
+def test_cached_geometry_without_stl_evidence_fails_closed(monkeypatch):
+    monkeypatch.setattr(cache, "load", lambda key: GeometryRef(
+        geometry_key=key, status="ready", source="cache"))
+    monkeypatch.setattr(cache, "stl_path", lambda key: None)
+
+    ref = cad_api.build_geometry(fin_space(), champion_params(),
+                                 verifier=FinGeometryVerifier())
+
+    assert ref.status == "failed"
+    assert ref.regen_status == "SANITY_FAIL"
+    assert ref.error == "cached_geometry_evidence_missing"
+    assert ref.onshape_calls == 0
+
+
+def test_readback_mismatch_also_triggers_restore(monkeypatch, tmp_path):
+    enable_write(monkeypatch)
+    before = config_snapshot("before")
+    mismatch = config_snapshot("after")
+    mismatch["currentConfiguration"][0]["value"] = 91.0
+    mismatch["configurationParameters"][0]["rangeAndDefault"]["defaultValue"] = 91.0
+    restored = config_snapshot("restored")
+    api, session, _ledger = client(tmp_path, [
+        FakeResponse(before), FakeResponse({"id": "pre-version"}),
+        FakeResponse({}), FakeResponse(mismatch), FakeResponse(mismatch),
+        FakeResponse({}), FakeResponse(restored),
+    ])
+    monkeypatch.setattr(cad_api, "_ledger", api.ledger)
+    monkeypatch.setattr(cad_api, "_client", api)
+
+    ref = commit_to_document(fin_space(), champion_params(), verifier=FinGeometryVerifier())
+
+    assert ref.regen_status == "ERROR"
+    assert "pre-write configuration restored" in ref.error
+    assert [call["method"] for call in session.calls] == [
+        "GET", "POST", "POST", "GET", "GET", "POST", "GET"]
+
+
+def test_budget_refusal_before_prewrite_version_is_not_a_partial_write(monkeypatch, tmp_path):
+    enable_write(monkeypatch)
+    before = config_snapshot("before")
+    api, session, ledger = client(tmp_path, [FakeResponse(before)])
+    # One remaining call admits the snapshot GET, then refuses the pre-write
+    # version before its HTTP request is sent.
+    ledger.calls_remaining = 1
+    monkeypatch.setattr(cad_api, "_ledger", ledger)
+    monkeypatch.setattr(cad_api, "_client", api)
+
+    ref = commit_to_document(fin_space(), champion_params(), verifier=FinGeometryVerifier())
+
+    assert ref.status == "failed"
+    assert ref.regen_status == "NOT_ATTEMPTED"
+    assert "onshape_budget_reserve" in ref.error
+    assert "PARTIAL_WRITE" not in ref.error
     assert [call["method"] for call in session.calls] == ["GET"]

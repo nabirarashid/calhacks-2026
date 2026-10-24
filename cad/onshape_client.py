@@ -8,8 +8,9 @@ Nothing here knows about fins. It speaks paths and returns bytes.
 import copy
 import math
 import os
+import time
 from typing import Dict, Optional, Tuple
-from urllib.parse import quote
+from urllib.parse import quote, urljoin, urlsplit
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -190,6 +191,44 @@ def verify_configuration_update(before, after, expected):
     }
 
 
+def build_configuration_restore(current, snapshot):
+    """Restore quantity current/default values from a pre-write snapshot.
+
+    The current response supplies a fresh source microversion and API metadata;
+    snapshot values supply only the state being restored.
+    """
+    if not isinstance(current, dict) or not isinstance(snapshot, dict):
+        raise ValueError("configuration restore requires object snapshots")
+    current_values = configuration_values(current)
+    saved_values = configuration_values(snapshot)
+    result = copy.deepcopy(current)
+    result["btType"] = "BTConfigurationUpdateCall-2933"
+    result["rejectMicroversionSkew"] = True
+    parameter_rows = {pid: row for pid, (row, _range_default)
+                      in _quantity_defaults(result).items()}
+    current_rows = { _parameter_id(row): row for row in result.get("currentConfiguration", []) }
+    if set(saved_values["defaults"]) != set(parameter_rows):
+        raise ValueError("snapshot/current quantity parameter sets differ")
+    for pid, saved_default in saved_values["defaults"].items():
+        if pid not in current_rows or pid not in current_values["current"]:
+            raise ValueError("current configuration lacks quantity parameter %s" % pid)
+        saved_current = configuration_values(snapshot)["current"].get(pid)
+        if saved_current is None:
+            raise ValueError("snapshot lacks current value for %s" % pid)
+        current_rows[pid]["value"] = saved_current
+        unit = current_rows[pid].get("units", current_rows[pid].get("unit", "")) or ""
+        aliases = {"millimeter": "mm", "millimeters": "mm", "mm": "mm",
+                   "degree": "deg", "degrees": "deg", "deg": "deg",
+                   "unitless": "", "dimensionless": "", "none": "", "": ""}
+        raw_unit = str(unit).strip().lower()
+        if raw_unit not in aliases:
+            raise ValueError("unsupported configuration unit for %s: %s" % (pid, unit))
+        unit_text = aliases[raw_unit]
+        current_rows[pid]["expression"] = ("%.15g" % float(saved_current)) + (" " + unit_text if unit_text else "")
+        parameter_rows[pid]["rangeAndDefault"]["defaultValue"] = saved_default
+    return result
+
+
 class OnshapeError(RuntimeError):
     """Non-retryable API failure. Carries the status code when there is one."""
 
@@ -291,8 +330,30 @@ class OnshapeClient(object):
             location = resp.headers.get("Location")
             if not location:
                 raise OnshapeError("redirect with no Location header", resp.status_code)
+            location = urljoin(url, location)
             seq2 = self.ledger.charge(purpose, method, "(redirect)")
-            resp = self._send(method, location, None, headers, json_body)
+            original, target = urlsplit(url), urlsplit(location)
+            same_origin = ((original.scheme.lower(), original.hostname, original.port)
+                           == (target.scheme.lower(), target.hostname, target.port))
+            if same_origin:
+                resp = self._send(method, location, None, headers, json_body)
+            else:
+                # Export downloads may redirect to object storage. Never carry
+                # Onshape auth or cookies to a different origin.
+                if target.scheme.lower() != "https" or not target.hostname:
+                    raise OnshapeError("refusing insecure external redirect")
+                clean_headers = {k: v for k, v in (headers or {}).items()
+                                 if k.lower() not in ("authorization", "cookie", "proxy-authorization")}
+                external = requests.Session()
+                try:
+                    external.auth = None
+                    external.cookies.clear()
+                    resp = external.request(method, location, headers=clean_headers,
+                                            timeout=TIMEOUT_S, allow_redirects=False)
+                except requests.exceptions.RequestException as exc:
+                    raise OnshapeError("external download connection failed: %s" % type(exc).__name__)
+                finally:
+                    external.close()
             self.ledger.set_status(seq2, resp.status_code)
 
         if resp.status_code >= 400:
@@ -416,6 +477,63 @@ class OnshapeClient(object):
             purpose, path_template="/partstudios/d/{did}/w/{wid}/e/{eid}/features",
         ).json()
 
+    def add_feature(self, did: str, wid: str, eid: str, payload: Dict,
+                    purpose: str = "build") -> Dict:
+        """Add one feature from an explicitly vetted Onshape feature payload."""
+        if not isinstance(payload, dict) or not payload:
+            raise ValueError("feature creation requires a non-empty vetted payload")
+        bt_type = payload.get("btType")
+        if not isinstance(bt_type, str) or not bt_type.startswith("BTFeatureDefinitionCall"):
+            raise ValueError("feature payload must have a BTFeatureDefinitionCall btType")
+        return self.request(
+            "POST", "/partstudios/d/%s/w/%s/e/%s/features" % (did, wid, eid),
+            purpose,
+            path_template="/partstudios/d/{did}/w/{wid}/e/{eid}/features",
+            headers={"Content-Type": "application/json"}, json_body=payload,
+        ).json()
+
+    def copy_workspace(self, did: str, wid: str, name: str,
+                       is_public: bool = False,
+                       purpose: str = "build_copy") -> Dict:
+        """Copy a workspace to a new document with an explicit access setting."""
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("workspace copy name is required")
+        if not isinstance(is_public, bool):
+            raise ValueError("is_public must be a boolean")
+        return self.request(
+            "POST", "/documents/%s/workspaces/%s/copy" % (did, wid), purpose,
+            path_template="/documents/{did}/workspaces/{wid}/copy",
+            headers={"Content-Type": "application/json"},
+            json_body={"newName": name.strip(), "isPublic": is_public},
+        ).json()
+
+    def get_elements(self, did: str, wid: str,
+                     purpose: str = "inspect") -> list:
+        """List document elements. One read-only call."""
+        return self.request(
+            "GET", "/documents/d/%s/w/%s/elements" % (did, wid), purpose,
+            path_template="/documents/d/{did}/w/{wid}/elements",
+        ).json()
+
+    def get_parts(self, did: str, wid: str, eid: str,
+                  purpose: str = "inspect") -> list:
+        """List Part Studio parts without thumbnails. One read-only call."""
+        return self.request(
+            "GET", "/parts/d/%s/w/%s" % (did, wid), purpose,
+            path_template="/parts/d/{did}/w/{wid}",
+            params={"elementId": eid, "withThumbnails": "false",
+                    "includePropertyDefaults": "false"},
+        ).json()
+
+    def get_mass_properties(self, did: str, wid: str, eid: str,
+                            purpose: str = "inspect") -> Dict:
+        """Read Part Studio mass properties in Onshape's SI units. One call."""
+        return self.request(
+            "GET", "/partstudios/d/%s/w/%s/e/%s/massproperties" % (did, wid, eid),
+            purpose,
+            path_template="/partstudios/d/{did}/w/{wid}/e/{eid}/massproperties",
+        ).json()
+
     def export_stl(self, did: str, wid: str, eid: str,
                    configuration: Optional[str] = None,
                    purpose: str = "build") -> str:
@@ -429,3 +547,50 @@ class OnshapeClient(object):
             params=params, headers={"Accept": STL_ACCEPT},
         )
         return resp.text
+
+    def export_step(self, did: str, wid: str, eid: str,
+                    configuration: Optional[str] = None,
+                    purpose: str = "build", timeout_s: float = 45.0,
+                    poll_interval_s: float = 0.5, max_polls: int = 12) -> bytes:
+        """Export configured STEP using Onshape's asynchronous translation API.
+
+        Each POST/poll/download is charged by ``request`` before it is sent.
+        IDs are kept in memory and never included in exceptions or log paths.
+        """
+        body = {"formatName": "STEP", "storeInDocument": False,
+                "translate": True}
+        if configuration:
+            body["configuration"] = configuration
+        created = self.request(
+            "POST", "/partstudios/d/%s/w/%s/e/%s/translations" % (did, wid, eid),
+            purpose, path_template="/partstudios/d/{did}/w/{wid}/e/{eid}/translations",
+            headers={"Content-Type": "application/json"}, json_body=body,
+        ).json()
+        translation_id = created.get("id") if isinstance(created, dict) else None
+        if not translation_id:
+            raise OnshapeError("STEP translation response lacks id")
+        deadline = time.monotonic() + max(0.0, timeout_s)
+        for poll in range(max_polls):
+            if poll and time.monotonic() >= deadline:
+                raise TimeoutError("STEP translation timed out")
+            state = self.request(
+                "GET", "/translations/%s" % translation_id, purpose,
+                path_template="/translations/{translationId}",
+            ).json()
+            request_state = state.get("requestState") if isinstance(state, dict) else None
+            if request_state == "FAILED":
+                raise OnshapeError("STEP translation failed")
+            if request_state == "DONE":
+                ids = state.get("resultExternalDataIds") or []
+                if not ids:
+                    raise OnshapeError("STEP translation completed without output")
+                result = self.request(
+                    "GET", "/documents/d/%s/externaldata/%s" % (did, ids[0]), purpose,
+                    path_template="/documents/d/{did}/externaldata/{fid}",
+                    follow_redirect=True,
+                )
+                return result.content
+            remaining = deadline - time.monotonic()
+            if poll + 1 < max_polls and remaining > 0:
+                time.sleep(min(poll_interval_s, remaining))
+        raise TimeoutError("STEP translation timed out")

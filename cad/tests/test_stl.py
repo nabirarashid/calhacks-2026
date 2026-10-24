@@ -6,6 +6,7 @@ import struct
 import pytest
 
 from cad import stl
+from domains.rocket_fin.verifier import FinGeometryVerifier
 from shared import fin_geometry
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "..", "..",
@@ -55,7 +56,7 @@ def test_ascii_roundtrip_matches_analytic():
 
 def test_sanity_check_passes_on_matching_geometry():
     mesh = stl.parse(fin_geometry.prism_stl(SQUARE))
-    ok, reasons = stl.sanity_check(SQUARE, mesh)
+    ok, reasons = stl.sanity_check(SQUARE, mesh, FinGeometryVerifier())
     assert ok, reasons
 
 
@@ -66,7 +67,7 @@ def test_sanity_check_fails_on_stale_geometry():
     other["root_chord"] = 130.0
     other["semi_span"] = 90.0
     mesh = stl.parse(fin_geometry.prism_stl(other))
-    ok, reasons = stl.sanity_check(SQUARE, mesh)
+    ok, reasons = stl.sanity_check(SQUARE, mesh, FinGeometryVerifier())
     assert not ok
     assert any("bbox" in r for r in reasons)
 
@@ -83,7 +84,7 @@ def test_sanity_check_catches_unit_scale_error():
         else:
             scaled.append(line)
     mesh = stl.parse("\n".join(scaled))
-    ok, reasons = stl.sanity_check(SQUARE, mesh)
+    ok, reasons = stl.sanity_check(SQUARE, mesh, FinGeometryVerifier())
     assert not ok
     assert reasons
 
@@ -112,7 +113,8 @@ def test_rejects_garbage():
 
 
 def test_measure_reports_regen_status():
-    out = stl.measure(SQUARE, fin_geometry.prism_stl(SQUARE))
+    out = stl.measure(SQUARE, fin_geometry.prism_stl(SQUARE),
+                      verifier=FinGeometryVerifier())
     assert out["regen_status"] == "OK"
     assert out["triangles"] == 12
     assert out["sanity_reasons"] == []

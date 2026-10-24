@@ -7,18 +7,11 @@ as a fallback in case the Accept header or defaults change under us.
 """
 import re
 import struct
-from typing import Dict, List, Optional, Tuple
-
-from shared import fin_geometry
-from shared.contracts import ParamValue
+from typing import List, Tuple
 
 # "vertex 1.234e+01 -5.0e+00 0.0" — three floats after the keyword.
 _FLOAT = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
 _VERTEX_RE = re.compile(r"vertex\s+(" + _FLOAT + r")\s+(" + _FLOAT + r")\s+(" + _FLOAT + r")")
-
-# Sanity-check tolerances (PLAN.md S1: bbox within 0.5 mm, volume within 6 %).
-BBOX_TOL_MM = 0.5
-VOLUME_TOL_FRAC = 0.06
 
 Triangle = Tuple[Tuple[float, float, float], Tuple[float, float, float], Tuple[float, float, float]]
 
@@ -123,53 +116,39 @@ def parse(data) -> Mesh:
         return parse_binary(raw)
 
 
-def sanity_check(params: Dict[str, ParamValue], mesh: Mesh,
-                 bbox_tol_mm: float = BBOX_TOL_MM,
-                 volume_tol_frac: float = VOLUME_TOL_FRAC) -> Tuple[bool, List[str]]:
-    """Compare a parsed mesh against the frozen analytic prediction for `params`.
-
-    This is the 0-call guard against silent regeneration failures and stale
-    exports: Onshape can return HTTP 200 with the geometry of the *previous*
-    configuration, and only the measurements reveal it.
-
-    Returns (ok, reasons). `reasons` is empty when ok.
-    """
-    reasons = []
-
-    want_bbox = fin_geometry.bbox_mm(params)
-    got_bbox = mesh.bbox()
-    labels = ("xmin", "ymin", "zmin", "xmax", "ymax", "zmax")
-    for label, want, got in zip(labels, want_bbox, got_bbox):
-        delta = abs(got - want)
-        if delta > bbox_tol_mm:
-            reasons.append("bbox %s off by %.3f mm (want %.3f, got %.3f)"
-                           % (label, delta, want, got))
-
-    want_vol = float(fin_geometry.derived(params)["volume_mm3"])
-    got_vol = mesh.volume_mm3()
-    if want_vol > 0:
-        frac = abs(got_vol - want_vol) / want_vol
-        if frac > volume_tol_frac:
-            reasons.append("volume off by %.1f %% (want %.1f mm3, got %.1f mm3)"
-                           % (frac * 100.0, want_vol, got_vol))
-
-    return (not reasons), reasons
+def sanity_check(params, mesh, verifier=None, bbox_tol_mm=0.5, volume_tol_frac=0.06):
+    """Run a caller supplied domain verifier; generic CAD has no domain policy."""
+    if verifier is None:
+        return False, ["domain geometry verifier was not provided"]
+    result = verifier.verify_data(params, _mesh_bytes(mesh))
+    return result["ok"], result["reasons"]
 
 
-def measure(params: Optional[Dict[str, ParamValue]], data) -> Dict[str, object]:
-    """Parse `data` and return the GeometryRef measurement fields.
+def _mesh_bytes(mesh):
+    # Keep the legacy helper usable for parsed Mesh instances without teaching
+    # this generic module any domain geometry. ASCII is sufficient for triangles.
+    rows = ["solid mesh"]
+    for tri in mesh.triangles:
+        rows.append("facet normal 0 0 0\nouter loop")
+        rows.extend("vertex %.9g %.9g %.9g" % v for v in tri)
+        rows.append("endloop\nendfacet")
+    rows.append("endsolid mesh")
+    return "\n".join(rows)
 
-    When `params` is given, the analytic sanity check runs too and the result
-    carries regen_status "OK" or "SANITY_FAIL" with the reasons.
-    """
-    mesh = parse(data)
+
+def measure(params_or_data, data=None, verifier=None) -> dict:
+    """Parse and measure; optional domain verifier adds regen status."""
+    params = params_or_data if data is not None else None
+    raw = data if data is not None else params_or_data
+    mesh = parse(raw)
     out = {
         "bbox_mm": [round(v, 4) for v in mesh.bbox()],
         "volume_mm3": round(mesh.volume_mm3(), 4),
         "triangles": mesh.triangle_count,
     }
     if params is not None:
-        ok, reasons = sanity_check(params, mesh)
-        out["regen_status"] = "OK" if ok else "SANITY_FAIL"
-        out["sanity_reasons"] = reasons
+        evidence = (verifier.verify_data(params, raw) if verifier is not None
+                    else {"ok": False, "reasons": ["domain geometry verifier was not provided"]})
+        out["regen_status"] = "OK" if evidence["ok"] else "SANITY_FAIL"
+        out["sanity_reasons"] = evidence["reasons"]
     return out

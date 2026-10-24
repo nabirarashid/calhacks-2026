@@ -4,7 +4,8 @@ import copy
 import pytest
 
 from cad.onshape_client import (build_configuration_update, configuration_values,
-                                parse_workspace_url, verify_configuration_update)
+                                OnshapeClient, parse_workspace_url,
+                                verify_configuration_update)
 
 
 def configuration():
@@ -137,3 +138,67 @@ def test_write_url_parser_accepts_only_workspaces():
         parse_workspace_url("https://cad.onshape.com/documents/doc/v/version/e/element")
     with pytest.raises(ValueError, match="/w/"):
         parse_workspace_url("https://cad.onshape.com/documents/doc/m/micro/e/element")
+
+
+class _FakeResponse(object):
+    def __init__(self, value):
+        self.value = value
+
+    def json(self):
+        return self.value
+
+
+def _request_recorder(monkeypatch, client):
+    calls = []
+
+    def fake_request(method, path, purpose, **kwargs):
+        calls.append((method, path, purpose, kwargs))
+        return _FakeResponse({"ok": True})
+
+    monkeypatch.setattr(client, "request", fake_request)
+    return calls
+
+
+def test_add_feature_posts_vetted_payload_to_template(monkeypatch):
+    client = OnshapeClient("access", "secret")
+    calls = _request_recorder(monkeypatch, client)
+    payload = {"btType": "BTFeatureDefinitionCall-1406", "feature": {"name": "Wing"}}
+
+    assert client.add_feature("doc", "work", "elem", payload, "wing_build") == {"ok": True}
+    expected_path = "/partstudios/d/doc/w/work/e/" + "elem/features"
+    assert calls == [("POST", expected_path, "wing_build", {
+        "path_template": "/partstudios/d/{did}/w/{wid}/e/{eid}/features",
+        "headers": {"Content-Type": "application/json"}, "json_body": payload,
+    })]
+
+
+@pytest.mark.parametrize("payload", [None, {}, [], {"btType": "BTMFeature-1"}])
+def test_add_feature_rejects_empty_or_wrong_payload(payload):
+    client = OnshapeClient("access", "secret")
+    with pytest.raises(ValueError, match="payload"):
+        client.add_feature("doc", "work", "elem", payload)
+
+
+def test_copy_workspace_posts_name_and_access_to_template(monkeypatch):
+    client = OnshapeClient("access", "secret")
+    calls = _request_recorder(monkeypatch, client)
+
+    assert client.copy_workspace("doc", "work", "Wing copy", True, "wing_copy") == {"ok": True}
+    assert calls == [("POST", "/documents/doc/workspaces/work/copy", "wing_copy", {
+        "path_template": "/documents/{did}/workspaces/{wid}/copy",
+        "headers": {"Content-Type": "application/json"},
+        "json_body": {"newName": "Wing copy", "isPublic": True},
+    })]
+
+
+@pytest.mark.parametrize("name", [None, "", "   "])
+def test_copy_workspace_rejects_empty_name(name):
+    client = OnshapeClient("access", "secret")
+    with pytest.raises(ValueError, match="name"):
+        client.copy_workspace("doc", "work", name)
+
+
+def test_copy_workspace_requires_boolean_access_setting():
+    client = OnshapeClient("access", "secret")
+    with pytest.raises(ValueError, match="boolean"):
+        client.copy_workspace("doc", "work", "copy", "false")

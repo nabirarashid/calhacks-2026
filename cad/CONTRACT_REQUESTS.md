@@ -20,7 +20,9 @@ measured from the root chord. The frozen `0..60 deg` contract is correct.
 
 ## 2. `make secrets-check` is broken and now always fails
 
-**Status: open. Requested by S1. Safety gate — worth fixing immediately.**
+**Status: resolved on current `main`.** `Makefile` now excludes
+`":!**/package-lock.json"`, and `make secrets-check` passes with both dashboard
+and Droid lockfiles present.
 
 **What.** In the `Makefile`, change the `secrets-check` exclude pathspec from
 `":!package-lock.json"` to `":!**/package-lock.json"`.
@@ -46,3 +48,59 @@ nothing in the tree.
 **Second-order note for whoever runs it in a script:** `make secrets-check |
 tail -2` swallows the failure, because a pipeline's exit status is the last
 command's. Call the target bare if you are gating on it.
+
+---
+
+## 3. Wire domain verifiers into every real CAD build
+
+**Status: open. Requested by W-A. Safety gate.**
+
+Generic `cad/` no longer imports `shared.fin_geometry` or selects a domain from
+`space.scorer`. `build_geometry`, print export, and `OnshapeCadAdapter` now fail
+closed without an injected `GeometryVerifier`. W-C's adapter/domain registry
+must construct the CAD adapter with `PACK.verifier` and pass the same verifier
+to legacy fin-facing calls during the compatibility window. Otherwise the real
+v1 backend path correctly returns `domain_geometry_verifier_required`.
+
+## 4. Bind and check the disposable write target revision
+
+**Status: open. Requested by W-A. Contract decision required.**
+
+`CadBinding.source_microversion` protects the source document, while commits go
+to `write_target_ref`. Add an optional `write_target_microversion` (or equivalent
+approval-bound target revision) so the adapter can refuse a disposable copy
+that changed after preview. The configuration POST already rejects skew after
+its fresh GET, but that does not prove the target still matches the revision the
+engineer reviewed.
+
+## 5. Carry protected-interface measurements into the verifier
+
+**Status: open. Requested by W-A.**
+
+The static verifier can compare injected mate-connector origins and exported
+hole diameters to `ProtectedInterface.nominal`, and fails closed when either is
+missing. The onboarding/domain plumbing needs to pass sanitized `CadInventory`
+mate-connector evidence plus hole-axis/diameter measurements from the geometry
+extractor into the verifier. Nominal points merely falling inside the body bbox
+are deliberately not treated as proof that a hole exists.
+
+## 6. Add run identity to CAD call-budget context
+
+**Status: open. Requested by W-A.**
+
+`Authority.max_onshape_calls_per_run` cannot be scoped perfectly from the B.4
+method signatures because `CadAdapter.build_geometry` receives a manifest but
+no run id. W-C should either instantiate one adapter per run or add an explicit
+run/execution context. W-A currently scopes counters by manifest object,
+project, revision, and source microversion; a reused manifest instance is
+therefore intentionally conservative across calls.
+
+## 7. Supply print-label metadata from the backend
+
+**Status: open. Requested by W-A.**
+
+The real print package now requires `design_id`, deterministic `score`, and the
+domain verifier. The existing backend route still calls the legacy three-arg
+signature. W-C should pass the selected design's id/score and registered
+verifier; until then the real route fails closed rather than emitting an
+unlabelled or unverified STL.

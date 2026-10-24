@@ -1,0 +1,32 @@
+{
+  "serializationVersion": "1.2.2",
+  "sourceMicroversion": "microversion-fixture-1",
+  "features": [
+    {
+      "feature": {
+        "btType": "BTMFeature-134",
+        "featureId": "fixture-aoa-feature",
+        "featureType": "assignVariable",
+        "name": "Variable 1",
+        "parameters": [
+          {"parameterId": "name", "message": {"value": "aoa_deg"}},
+          {"parameterId": "variableType", "message": {"value": "ANGLE"}},
+          {"parameterId": "angleValue", "message": {"expression": "6 deg"}}
+        ]
+      }
+    },
+    {
+      "feature": {
+        "btType": "BTMFeature-134",
+        "featureId": "fixture-span-feature",
+        "featureType": "assignVariable",
+        "name": "Variable 2",
+        "parameters": [
+          {"parameterId": "name", "message": {"value": "span_mm"}},
+          {"parameterId": "variableType", "message": {"value": "LENGTH"}},
+          {"parameterId": "lengthValue", "message": {"expression": "850 mm"}}
+        ]
+      }
+    }
+  ]
+}

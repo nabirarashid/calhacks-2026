@@ -15,6 +15,7 @@ return a GeometryRef with a status and an error, like cad.api.build_geometry.
 """
 import hashlib
 import json
+import math
 import os
 import re
 import time
@@ -28,6 +29,7 @@ from cad.onshape_client import OnshapeError, parse_doc_url
 VALUE_PARAM = {"LENGTH": "lengthValue", "ANGLE": "angleValue", "NUMBER": "numberValue", "ANY": "anyValue"}
 _LITERAL = re.compile(r"^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\s*([A-Za-z]*)\s*$")
 _UNIT = {"mm": "mm", "millimeter": "mm", "deg": "deg", "degree": "deg", "": ""}
+_SAFE_VARIABLE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _api():
@@ -69,8 +71,32 @@ def write_allowed(doc_url: str) -> bool:
 
 # ---------------------------------------------------------------- reading
 
+def _feature_body(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize flat and wrapped GET /features rows."""
+    feature = row.get("feature", row) if isinstance(row, dict) else {}
+    return feature.get("message", feature) if isinstance(feature, dict) else {}
+
+
+def _parameter_body(parameter: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize flat and ``message``-wrapped Onshape parameters."""
+    if not isinstance(parameter, dict):
+        return {}
+    message = parameter.get("message")
+    if isinstance(message, dict):
+        body = dict(message)
+        body.setdefault("parameterId", parameter.get("parameterId"))
+        return body
+    return parameter
+
+
 def _params_by_id(feature: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    return {p.get("parameterId"): p for p in feature.get("parameters", []) if isinstance(p, dict)}
+    out = {}
+    for parameter in feature.get("parameters", []):
+        body = _parameter_body(parameter)
+        parameter_id = body.get("parameterId")
+        if parameter_id:
+            out[parameter_id] = body
+    return out
 
 
 def parse_literal(expression: str) -> Tuple[Optional[float], str]:
@@ -84,7 +110,8 @@ def parse_literal(expression: str) -> Tuple[Optional[float], str]:
 def parse_variables(features: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     """Variable features in a GET /features body -> {name: {feature_id, value_param, expression, value, unit, type}}."""
     out = {}  # type: Dict[str, Dict[str, Any]]
-    for f in features.get("features", []):
+    for row in features.get("features", []):
+        f = _feature_body(row)
         if f.get("featureType") != "assignVariable":
             continue
         params = _params_by_id(f)
@@ -109,6 +136,39 @@ def format_expression(value: ParamValue, unit: str) -> str:
     return "%s %s" % (text, unit) if unit else text
 
 
+def build_variable_feature(name: str, value: ParamValue, unit: str) -> Dict[str, Any]:
+    """Build the documented POST payload for a new Variable feature.
+
+    GET responses may wrap fields in ``message`` objects, but the Feature API
+    expects create-feature parameter fields directly on each parameter.
+    """
+    if not isinstance(name, str) or not _SAFE_VARIABLE_NAME.fullmatch(name):
+        raise ValueError("variable name must start with a letter or underscore and contain only letters, digits, and underscores")
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+        raise ValueError("variable value must be a finite number")
+    typed = {"mm": ("LENGTH", "lengthValue"),
+             "deg": ("ANGLE", "angleValue"),
+             "": ("NUMBER", "numberValue")}
+    if unit not in typed:
+        raise ValueError("unit must be mm, deg, or empty")
+    variable_type, value_parameter = typed[unit]
+    return {
+        "btType": "BTFeatureDefinitionCall-1406",
+        "feature": {
+            "btType": "BTMFeature-134",
+            "featureType": "assignVariable",
+            "name": "Variable " + name,
+            "parameters": [
+                {"btType": "BTMParameterString-149", "parameterId": "name", "value": name},
+                {"btType": "BTMParameterEnum-145", "parameterId": "variableType",
+                 "enumName": "VariableType", "value": variable_type},
+                {"btType": "BTMParameterQuantity-147", "parameterId": value_parameter,
+                 "isInteger": False, "expression": format_expression(value, unit)},
+            ],
+        },
+    }
+
+
 def list_variables(doc_url: str) -> Dict[str, Dict[str, Any]]:
     """Live Variable values for the panel's change/keep list. 1 call. Raises OnshapeError on HTTP failure."""
     c = _api()._get_client()
@@ -131,8 +191,12 @@ def _post_feature(c: Any, did: str, wid: str, eid: str, features: Dict[str, Any]
 def _with_expression(feature: Dict[str, Any], value_param: str, expression: str) -> Dict[str, Any]:
     f = json.loads(json.dumps(feature))
     for p in f.get("parameters", []):
-        if p.get("parameterId") == value_param:
-            p["expression"] = expression
+        body = _parameter_body(p)
+        if body.get("parameterId") == value_param:
+            if isinstance(p.get("message"), dict):
+                p["message"]["expression"] = expression
+            else:
+                p["expression"] = expression
     return f
 
 
@@ -169,7 +233,8 @@ def apply_values(doc_url: str, params: Mapping[str, ParamValue], units: Mapping[
         if missing:
             return _fail(key, "no Variable feature named %s in the Part Studio" % ", ".join(missing), calls(), started,
                          regen="NOT_ATTEMPTED")
-        by_id = {f.get("featureId"): f for f in features.get("features", [])}
+        by_id = {_feature_body(row).get("featureId"): _feature_body(row)
+                 for row in features.get("features", [])}
         changes = []  # type: List[Tuple[str, Dict[str, Any], str]]
         for name, value in params.items():
             var = variables[name]
@@ -220,4 +285,4 @@ def create_version(doc_url: str, name: str) -> Optional[str]:
 
 
 __all__ = ["VALUE_PARAM", "resolve_doc", "write_allowed", "parse_literal", "parse_variables", "format_expression",
-           "list_variables", "apply_values", "create_version"]
+           "build_variable_feature", "list_variables", "apply_values", "create_version"]
