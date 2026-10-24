@@ -188,7 +188,7 @@ def step_export():
             ok_all = False
             for r in measured.get("sanity_reasons", []):
                 print("      %s" % r)
-    print("  -> %s" % ("VERDICT A: configured export works, ~1 call/design"
+    print("  -> %s" % ("VERDICT A: configured export works, 2 calls/design (307 + 200)"
                        if ok_all else
                        "configured export did NOT verify: see the ladder (B, then C)"))
     return ok_all

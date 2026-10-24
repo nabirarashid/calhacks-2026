@@ -54,7 +54,7 @@ Exact agreement on three different param sets means `root_chord`,
 configuration really is being applied. Local encoding costs 0 calls per design,
 so the missing endpoint buys us nothing anyway.
 
-## Open defect: the sweep angle is complementary
+## RESOLVED defect: the sweep angle was complementary
 
 All three exports failed the analytic bbox sanity check on `xmax`, while volume
 matched exactly. Planform area is independent of sweep (shearing a trapezoid
@@ -73,9 +73,17 @@ The Part Studio measures the leading-edge angle from the **root chord (x axis)**
 B.5 defines Λ from the **spanwise direction (z axis)**: tip LE sits at
 `x = s·tan Λ`, so Λ = 0 means an unswept leading edge.
 
-**Fix (one field, no re-constraining):** set the sketch's angle dimension
-expression to `90 deg - #sweep_deg`. Re-run `python -m cad.spike export` to
-confirm; all three sets should report `OK`.
+**Fixed** in the Part Studio (the sketch angle now reads `90 deg - #sweep_deg`).
+Re-verified with `python -m cad.spike export`:
+
+| Param set | Volume | bbox worst error | Export |
+|---|---|---|---|
+| default (90 / 0.5 / 60 / 30 / 3) | 12150 mm3 | **0.000 mm** | 383 ms |
+| near-min (55 / 0.25 / 35 / 5 / 2.2) | 2647 mm3 | **0.000 mm** | 250 ms |
+| near-max (125 / 0.9 / 85 / 55 / 4.8) | 48450 mm3 | **0.000 mm** | 249 ms |
+
+Exact agreement on bounding box and volume across the parameter box. The
+configured-export path is verified end to end.
 
 This is a CAD defect, not a contract or code defect. The sanity check caught it
 with zero extra calls, which is what it is for — without it, the demo would have
