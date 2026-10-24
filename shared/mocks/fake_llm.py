@@ -83,7 +83,7 @@ def _generic_goal(inp: Dict[str, Any], text: str) -> Dict[str, Any]:
     """Any non-fin catalog: maximize the first 'higher' metric the text names (else the first one), and read
     limits like 'under 15 N of drag' as <= constraints on the matching metric."""
     low = text.lower()
-    metrics = inp.get("metrics", [])
+    metrics = [{"name": m} if isinstance(m, str) else m for m in inp.get("metrics", [])]
     higher = [m["name"] for m in metrics if m.get("better") == "higher"]
     named = [n for n in higher if n.split("_")[0] in low] or higher[:1]
     objectives = [{"metric": n, "direction": "maximize", "weight": 1.0} for n in named[:1]]
@@ -100,7 +100,8 @@ def _generic_goal(inp: Dict[str, Any], text: str) -> Dict[str, Any]:
 def _goal_parser(inp: Dict[str, Any]) -> Dict[str, Any]:
     text = str(inp.get("text", ""))
     low = text.lower()
-    if not any(m.get("name") == "stability_margin_cal" for m in inp.get("metrics", [{"name": "stability_margin_cal"}])):
+    names = [m if isinstance(m, str) else m.get("name") for m in inp.get("metrics", ["stability_margin_cal"])]
+    if "stability_margin_cal" not in names:          # metrics arrive as names (mock server) or objects (backend)
         return _generic_goal(inp, text)
     objectives = [{"metric": "stability_margin_cal", "direction": "target", "target": 2.0, "tolerance": 0.75,
                    "weight": 0.5}]
