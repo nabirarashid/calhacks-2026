@@ -8,6 +8,12 @@ import type {
   RunConfig,
   RunSummary,
 } from '@shared/contracts';
+import type {
+  InspectResponse,
+  Notebook,
+  StartSessionRequest,
+  StartSessionResponse,
+} from '@shared/investigation';
 
 export class ApiError extends Error {
   constructor(
@@ -56,6 +62,20 @@ export const api = {
       body: JSON.stringify({ goal, design_space_id: designSpaceId, config }),
     }),
   stopRun: (runId: string) => request<RunSummary>(`/api/runs/${runId}/stop`, { method: 'POST' }),
+  inspect: (docUrl: string) =>
+    request<InspectResponse>('/api/inspect', {
+      method: 'POST',
+      body: JSON.stringify({ doc_url: docUrl }),
+    }),
+  startSession: (body: StartSessionRequest) =>
+    request<StartSessionResponse>('/api/sessions', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  sessionNotebook: (runId: string) =>
+    request<Notebook>(`/api/sessions/${runId}/notebook`),
+  stopSession: (runId: string) =>
+    request<RunSummary>(`/api/sessions/${runId}/stop`, { method: 'POST' }),
   replay: (recording: string, speed: number) =>
     request<{ run_id: string }>('/api/replay', {
       method: 'POST',
