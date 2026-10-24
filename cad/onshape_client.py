@@ -92,6 +92,7 @@ class OnshapeClient(object):
                 path_template: Optional[str] = None,
                 params: Optional[Dict[str, str]] = None,
                 headers: Optional[Dict[str, str]] = None,
+                json_body: Optional[Dict] = None,
                 follow_redirect: bool = True) -> requests.Response:
         """Charge, send, and optionally follow one authenticated redirect.
 
@@ -100,7 +101,7 @@ class OnshapeClient(object):
         """
         url = path if path.startswith("http") else self.base + path
         seq = self.ledger.charge(purpose, method, path_template or path)
-        resp = self._send(method, url, params, headers)
+        resp = self._send(method, url, params, headers, json_body)
         self.ledger.set_status(seq, resp.status_code)
 
         if follow_redirect and resp.status_code in (301, 302, 303, 307, 308):
@@ -108,7 +109,7 @@ class OnshapeClient(object):
             if not location:
                 raise OnshapeError("redirect with no Location header", resp.status_code)
             seq2 = self.ledger.charge(purpose, method, "(redirect)")
-            resp = self._send(method, location, None, headers)
+            resp = self._send(method, location, None, headers, json_body)
             self.ledger.set_status(seq2, resp.status_code)
 
         if resp.status_code >= 400:
@@ -117,12 +118,13 @@ class OnshapeClient(object):
                                resp.status_code)
         return resp
 
-    def _send(self, method: str, url: str, params, headers) -> requests.Response:
+    def _send(self, method: str, url: str, params, headers,
+              json_body=None) -> requests.Response:
         last = None
         for attempt in (0, 1):
             try:
                 return self._session.request(
-                    method, url, params=params, headers=headers,
+                    method, url, params=params, headers=headers, json=json_body,
                     timeout=TIMEOUT_S, allow_redirects=False)
             except requests.exceptions.RequestException as exc:
                 last = exc                      # connection-level only; no 4xx retry
