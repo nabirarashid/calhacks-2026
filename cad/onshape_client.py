@@ -5,6 +5,8 @@ included, because the usage page counts them until the spike proves otherwise.
 
 Nothing here knows about fins. It speaks paths and returns bytes.
 """
+import copy
+import math
 import os
 from typing import Dict, Optional, Tuple
 from urllib.parse import quote
@@ -17,6 +19,175 @@ from cad.ledger import Ledger
 API_BASE = "https://cad.onshape.com/api/v10"
 TIMEOUT_S = 20.0
 STL_ACCEPT = "application/vnd.onshape.v1+octet-stream"
+QUANTITY_TYPES = {
+    "BTMConfigurationParameterQuantity-1826",
+    "BTMConfigurationParameterQuantity",
+}
+_NUMERIC_TOLERANCE = 1e-9
+
+
+def _parameter_id(row):
+    if not isinstance(row, dict):
+        return None
+    return row.get("parameterId") or (row.get("message") or {}).get("parameterId")
+
+
+def _is_quantity(parameter):
+    return (parameter.get("typeName") in QUANTITY_TYPES
+            or parameter.get("btType") in QUANTITY_TYPES
+            or parameter.get("message", {}).get("typeName") in QUANTITY_TYPES)
+
+
+def _as_finite_number(value, parameter_id):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("configuration value for %s must be numeric" % parameter_id)
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("configuration value for %s must be finite" % parameter_id)
+    return number
+
+
+def _close(a, b):
+    return math.isclose(float(a), float(b), rel_tol=_NUMERIC_TOLERANCE,
+                        abs_tol=_NUMERIC_TOLERANCE)
+
+
+def _quantity_defaults(configuration):
+    parameters = configuration.get("configurationParameters")
+    if not isinstance(parameters, list):
+        raise ValueError("configuration response has no configurationParameters list")
+    out = {}
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            raise ValueError("configuration response contains malformed parameter")
+        pid = _parameter_id(parameter)
+        if not pid:
+            raise ValueError("configuration parameter lacks parameterId")
+        if pid in out:
+            raise ValueError("configuration response repeats parameterId %s" % pid)
+        if _is_quantity(parameter):
+            range_default = parameter.get("rangeAndDefault")
+            if not isinstance(range_default, dict) or "defaultValue" not in range_default:
+                raise ValueError("quantity parameter %s lacks rangeAndDefault.defaultValue" % pid)
+            out[pid] = (parameter, range_default)
+    return out
+
+
+def build_configuration_update(configuration, expected):
+    """Build a guarded quantity-only update from a fresh configuration GET.
+
+    The GET body is copied intact so API metadata and unmodified inputs survive.
+    Values are expressed in the units declared on each current-configuration row.
+    """
+    if not isinstance(configuration, dict):
+        raise ValueError("configuration response must be an object")
+    if not isinstance(expected, dict) or not expected:
+        raise ValueError("configuration update requires expected quantity values")
+    for field in ("sourceMicroversion", "serializationVersion"):
+        if not isinstance(configuration.get(field), str) or not configuration[field].strip():
+            raise ValueError("configuration response lacks %s" % field)
+    library_version = configuration.get("libraryVersion")
+    if isinstance(library_version, bool) or not isinstance(library_version, int):
+        raise ValueError("configuration response lacks integer libraryVersion")
+    if configuration.get("microversionSkew") is True:
+        raise ValueError("cannot update configuration with microversionSkew=true")
+
+    quantity_params = _quantity_defaults(configuration)
+    unknown = sorted(pid for pid in expected if pid not in quantity_params)
+    if unknown:
+        raise ValueError("target ids are not quantity parameters: %s" % ", ".join(unknown))
+
+    rows = configuration.get("currentConfiguration")
+    if not isinstance(rows, list):
+        raise ValueError("configuration response has no currentConfiguration list")
+    row_by_id = {}
+    for row in rows:
+        pid = _parameter_id(row)
+        if not pid or pid in row_by_id:
+            raise ValueError("configuration response has missing or duplicate current parameterId")
+        row_by_id[pid] = row
+
+    result = copy.deepcopy(configuration)
+    result["btType"] = "BTConfigurationUpdateCall-2933"
+    result["rejectMicroversionSkew"] = True
+    # A false/absent response flag is not copied as permission to accept skew.
+    for pid, raw_value in expected.items():
+        if pid not in row_by_id:
+            raise ValueError("current configuration lacks target parameter %s" % pid)
+        value = _as_finite_number(raw_value, pid)
+        parameter, range_default = quantity_params[pid]
+        low = range_default.get("minValue")
+        high = range_default.get("maxValue")
+        if low is not None and value < _as_finite_number(low, pid):
+            raise ValueError("configuration value for %s is below minValue" % pid)
+        if high is not None and value > _as_finite_number(high, pid):
+            raise ValueError("configuration value for %s is above maxValue" % pid)
+
+        row = next(r for r in result["currentConfiguration"] if _parameter_id(r) == pid)
+        units = row.get("units", row.get("unit", range_default.get("units", ""))) or ""
+        raw_unit = str(units).strip().lower()
+        unit_aliases = {
+            "": "", "unitless": "", "dimensionless": "", "none": "",
+            "millimeter": "mm", "millimeters": "mm", "mm": "mm",
+            "degree": "deg", "degrees": "deg", "deg": "deg",
+        }
+        if raw_unit not in unit_aliases:
+            raise ValueError("unsupported configuration unit for %s: %s" % (pid, units))
+        unit_text = unit_aliases[raw_unit]
+        expression = ("%.15g" % value) + ((" " + unit_text) if unit_text else "")
+        row["value"] = value
+        row["expression"] = expression
+        default_row = next(p for p in result["configurationParameters"]
+                           if _parameter_id(p) == pid)
+        default_row["rangeAndDefault"]["defaultValue"] = value
+    return result
+
+
+def configuration_values(configuration):
+    """Extract numeric current values and default values for quantity inputs."""
+    current_rows = configuration.get("currentConfiguration")
+    if not isinstance(current_rows, list):
+        raise ValueError("configuration response has no currentConfiguration list")
+    current = {}
+    for row in current_rows:
+        pid = _parameter_id(row)
+        if not pid or pid in current or "value" not in row:
+            raise ValueError("configuration current row lacks unique parameterId/value")
+        current[pid] = row["value"]
+    defaults = {}
+    for pid, (_parameter, range_default) in _quantity_defaults(configuration).items():
+        defaults[pid] = range_default["defaultValue"]
+    return {"current": current, "defaults": defaults}
+
+
+def verify_configuration_update(before, after, expected):
+    """Verify current/default values and require the write to advance microversion."""
+    if not isinstance(expected, dict) or not expected:
+        raise ValueError("configuration verification requires expected values")
+    before_mv = before.get("sourceMicroversion")
+    after_mv = after.get("sourceMicroversion")
+    if not before_mv or not after_mv:
+        raise ValueError("configuration response lacks sourceMicroversion")
+    before_values = configuration_values(before)
+    after_values = configuration_values(after)
+    missing = []
+    mismatched = {}
+    for pid, value in expected.items():
+        target = _as_finite_number(value, pid)
+        for category in ("current", "defaults"):
+            observed = after_values[category].get(pid)
+            if observed is None:
+                missing.append("%s:%s" % (category, pid))
+            elif not _close(_as_finite_number(observed, pid), target):
+                mismatched["%s:%s" % (category, pid)] = {
+                    "expected": target, "observed": observed,
+                }
+    return {
+        "ok": not missing and not mismatched and after_mv != before_mv,
+        "missing": sorted(missing), "mismatched": mismatched,
+        "microversion_changed": after_mv != before_mv,
+        "source_microversion": after_mv,
+    }
 
 
 class OnshapeError(RuntimeError):
@@ -44,6 +215,18 @@ def parse_doc_url(url: str) -> Tuple[str, str, str]:
     if not (did and wid and eid):
         raise ValueError("could not parse did/wid/eid from Onshape URL")
     return did, wid, eid
+
+
+def parse_workspace_url(url: str) -> Tuple[str, str, str]:
+    """Parse an editable workspace URL and reject immutable version/microversion URLs."""
+    parts = [p for p in url.split("?")[0].split("/") if p]
+    try:
+        marker = next(i for i, part in enumerate(parts) if part in ("w", "v", "m"))
+    except StopIteration:
+        raise ValueError("Onshape write target has no workspace marker")
+    if parts[marker] != "w":
+        raise ValueError("Onshape write target must be a /w/ workspace URL")
+    return parse_doc_url(url)
 
 
 def encode_configuration(values: Dict[str, object], units: Dict[str, str]) -> str:

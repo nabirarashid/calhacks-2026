@@ -6,6 +6,7 @@ the dashboard can fall back to its parametric preview.
 """
 import os
 import time
+from datetime import datetime, timezone
 from typing import Dict, Optional
 
 from shared.contracts import (DesignSpace, GeometryRef, ParamValue, canonicalize,
@@ -159,21 +160,14 @@ def build_geometry(space: DesignSpace, params: Dict[str, ParamValue],
 
 
 def commit_to_document(space: DesignSpace, params: Dict[str, ParamValue]) -> GeometryRef:
-    """Persist a champion only after an explicitly enabled, verified workflow.
+    """Persist an exact champion as verified defaults, then create a version.
 
-    This public entry point is deliberately fail-closed.  A configured STL
-    export is read-only; it must never be described as a committed document
-    change.  The low-level client exposes the official update/read-back/version
-    endpoints, but this repository has no recorded, document-specific update
-    body for the configuration's quantity/list parameter objects.  Constructing
-    one from canonical parameters would be a write-schema guess.
-
-    Consequently even the explicit opt-in is a guard, not permission to make a
-    speculative POST.  A developer must first record a verified payload shape
-    for an isolated development workspace, then wire a workflow that performs:
-    update -> exact read-back -> configured STL sanity check -> named version.
-    Until then this function makes zero network calls and returns a non-ready
-    GeometryRef that callers can surface honestly.
+    The write path is intentionally narrower than ``build_geometry``.  It only
+    accepts a separately acknowledged workspace URL, derives a quantity-only
+    update from a fresh configuration GET, requires a new source microversion,
+    verifies both current and default values, sanity-checks the default STL, and
+    creates a named version last.  Any unsupported CAD parameter or failed check
+    stops the sequence; a partial write is reported and is never called a commit.
     """
     started = time.time()
     try:
@@ -194,11 +188,94 @@ def commit_to_document(space: DesignSpace, params: Dict[str, ParamValue]) -> Geo
         return _fail(key, "onshape_write_requires_isolated_workspace", started,
                      regen="NOT_ATTEMPTED", status="skipped")
 
-    return _fail(
-        key,
-        "onshape_write_schema_unverified: no developer-verified configuration "
-        "update payload is recorded; no POST attempted",
-        started, regen="NOT_ATTEMPTED", status="skipped")
+    url = _doc_url(space)
+    target_url = (os.environ.get("DARWIN_ONSHAPE_WRITE_TARGET_URL") or "").strip()
+    if not url:
+        return _fail(key, "DARWIN_FIN_DOC_URL is not set", started,
+                     regen="NOT_ATTEMPTED", status="skipped")
+    if not target_url:
+        return _fail(key, "onshape_write_target_not_acknowledged", started,
+                     regen="NOT_ATTEMPTED", status="skipped")
+
+    led = _get_ledger()
+    if led.hard_stop():
+        return _fail(key, "onshape_budget_reserve", started,
+                     regen="NOT_ATTEMPTED", status="skipped")
+
+    before_calls = led.calls_total()
+    wrote = False
+
+    def failed(message: str, regen: str = "ERROR") -> GeometryRef:
+        ref = _fail(key, message, started, regen=regen)
+        ref.onshape_calls = led.calls_total() - before_calls
+        return ref
+
+    try:
+        from cad.onshape_client import (build_configuration_update,
+                                        encode_configuration,
+                                        parse_workspace_url,
+                                        verify_configuration_update)
+
+        doc_ref = parse_workspace_url(url)
+        acknowledged_ref = parse_workspace_url(target_url)
+        if doc_ref != acknowledged_ref:
+            return failed("onshape_write_target_mismatch", "NOT_ATTEMPTED")
+        did, wid, eid = doc_ref
+
+        expected = _cad_values(space, canon)
+        if not expected:
+            return failed("onshape_write_has_no_cad_parameters", "NOT_ATTEMPTED")
+
+        client = _get_client()
+        before = client.get_configuration(did, wid, eid, purpose="commit_preflight")
+        payload = build_configuration_update(before, expected)
+        client.update_configuration(did, wid, eid, payload, purpose="commit_update")
+        wrote = True
+        after = client.get_configuration(did, wid, eid, purpose="commit_verify")
+        verification = verify_configuration_update(before, after, expected)
+        if not verification["ok"]:
+            return failed("onshape_partial_write: configuration read-back failed")
+
+        # Use an explicit configuration for deterministic geometry verification;
+        # the read-back above independently proves that the defaults persisted.
+        encoded = encode_configuration(expected, _cad_units(space))
+        text = client.export_stl(did, wid, eid, configuration=encoded,
+                                 purpose="commit_geometry_verify")
+        measured = stl.measure(canon, text)
+        if measured.get("regen_status") != "OK":
+            reasons = "; ".join(measured.get("sanity_reasons", []))
+            return failed("onshape_partial_write: geometry verification failed: %s" % reasons,
+                          "SANITY_FAIL")
+
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%SZ")
+        version_name = "Darwin verified %s %s" % (key[:8], stamp)
+        version = client.create_version(did, wid, version_name,
+                                        purpose="commit_version")
+        if not isinstance(version, dict) or not version.get("id"):
+            return failed("onshape_partial_write: version creation returned no id")
+
+        ref = GeometryRef(
+            geometry_key=key, status="ready", source="onshape_config",
+            stl_url="/api/geometry/%s.stl" % key,
+            bbox_mm=measured["bbox_mm"], volume_mm3=measured["volume_mm3"],
+            triangles=measured["triangles"],
+            onshape_calls=led.calls_total() - before_calls,
+            regen_status="OK",
+            elapsed_ms=round((time.time() - started) * 1000.0, 2),
+        )
+        try:
+            cache.store(ref, text)
+        except Exception:
+            pass
+        return ref
+    except BudgetExceeded as exc:
+        prefix = "onshape_partial_write" if wrote else "onshape_write_blocked"
+        return failed("%s: onshape_budget_reserve: %s" % (prefix, exc),
+                      "ERROR" if wrote else "NOT_ATTEMPTED")
+    except Exception as exc:
+        prefix = "onshape_partial_write" if wrote else "onshape_write_blocked"
+        return failed("%s: %s: %s" % (prefix, type(exc).__name__, exc),
+                      "ERROR" if wrote else "NOT_ATTEMPTED")
 
 
 def export_print_package(space: DesignSpace, params: Dict[str, ParamValue],

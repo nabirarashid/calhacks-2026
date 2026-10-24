@@ -235,9 +235,16 @@ def geometry(name: str) -> FileResponse:
 
 @app.post("/api/runs/{run_id}/commit")
 def commit(run_id: str, req: DesignRequest) -> Dict[str, Any]:
-    d = _find_design(run_id, req.design_id)
-    space = _space(_summary(run_id)["design_space_id"])
-    return W.cad.commit_to_document(space, d["params"]).model_dump(mode="json")
+    summary = _summary(run_id)
+    champion = summary.get("champion") or {}
+    if summary.get("status") != "complete" or not champion:
+        raise HTTPException(409, "only the completed run champion can be committed")
+    if req.design_id != champion.get("design_id"):
+        raise HTTPException(409, "only the completed run champion can be committed")
+    if evidence.load_approval(run_id, champion) is None:
+        raise HTTPException(409, "the completed run champion must be approved before commit")
+    space = _space(summary["design_space_id"])
+    return W.cad.commit_to_document(space, champion["params"]).model_dump(mode="json")
 
 
 @app.post("/api/runs/{run_id}/approve")

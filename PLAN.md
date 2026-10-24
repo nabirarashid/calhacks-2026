@@ -23,11 +23,15 @@ persist the selected values into the document.
 Execution status (updated during implementation): deterministic evidence and
 approval endpoints and the review UI are implemented and tested. CAD now has
 ledgered update/read-back/version primitives plus explicit fail-closed write
-guards. Live persistence remains blocked: the repository has neither a
-developer-verified quantity/list configuration update payload nor a trustworthy
-binding to an isolated development workspace. `commit_to_document` therefore
-returns `skipped` with zero network calls even after opt-in. No external Onshape
-write has been attempted.
+guards. The local secret file is present, authentication succeeds, the configured
+URL is a workspace URL, and a live read-only configuration GET verified five
+quantity inputs and their units/ranges. The update payload, read-back, geometry
+verification, named-version sequence, exact-target acknowledgement, and backend
+approval gate are implemented under mocked tests. The live document does not
+have Darwin's sixth CAD-driven input, `edge_profile`; this mismatch blocks an
+exact champion handoff until the model gains that input or the live design space
+is deliberately constrained to square edges. No external Onshape write has been
+attempted.
 
 - [x] **Engineering diff:** show seed-to-champion parameter changes, metric
   changes, every hard requirement with actual/limit/margin/pass-fail, CAD
@@ -51,6 +55,24 @@ write has been attempted.
   the written values and regenerated geometry before claiming success. If a
   safe write path is not established, retain the zero-write configured export,
   label it accurately, and stop this item rather than guessing.
+- [x] **Read-only Onshape preflight:** load the out-of-repo credentials and URL,
+  authenticate, require a `/w/` workspace target, and verify that `root_chord`,
+  `taper_ratio`, `semi_span`, `sweep_deg`, and `thickness` are quantity inputs
+  with the frozen units and ranges. Raw responses remain gitignored.
+- [x] **Configuration write payload:** derive `BTConfigurationUpdateCall-2933`
+  only from a fresh GET response; preserve server metadata and untouched fields,
+  reject stale/skewed source microversions, validate finite in-range values, and
+  update both the current quantity values and matching defaults. Cover the real
+  sanitized response shape with mocked tests before any POST.
+- [x] **Guarded commit sequence:** require a completed, approved exact champion,
+  explicit write opt-in, isolated-workspace acknowledgement, and an exact target
+  URL match; then update, read back, verify the configured STL, and create the
+  named version last. Any unsupported parameter or partial failure stops without
+  claiming success.
+- [ ] **Controlled live smoke test:** after the user explicitly confirms the
+  configured workspace is disposable, change one non-winning value, read it
+  back, export and sanity-check the resulting STL, restore or apply the approved
+  champion, verify again, and create a named version only after all checks pass.
 - [ ] **Integration:** Python tests, dashboard tests/build, secrets check, one
   real dry run, one offline replay, evidence/report inspection, and a two-minute
   rehearsal with no terminal or broken control.
@@ -83,10 +105,13 @@ development copy only after explicit write opt-in.
 - Offline replay visual QA: passed; the winner modal scrolls correctly and
   displays parameter changes, requirement margins, CAD evidence, approval, and
   the failure-to-correction sequence.
-- Live Onshape write: **not attempted**. It remains the only blocked P0 item and
-  requires an explicitly designated disposable development workspace plus a
-  developer-verified configuration update payload before the guard may be
-  removed.
+- Live Onshape read-only preflight: **passed** against the configured workspace;
+  authentication and the expected five quantity inputs/ranges were verified.
+- Guarded Onshape persistence and approval gate: mocked sequence tests pass;
+  update is followed by read-back, geometry verification, and version creation.
+- Live Onshape write: **not attempted**. It remains blocked because the model
+  lacks the CAD-driven `edge_profile` input and the configured workspace has not
+  yet been explicitly confirmed as a disposable development target.
 
 ### Post-hackathon
 
@@ -241,6 +266,9 @@ ONSHAPE_CALLS_REMAINING_AT=
 DARWIN_ONSHAPE_RESERVE=400      # hard floor; refuse calls below it
 DARWIN_ALLOW_RESERVE=0          # set to 1 ONLY at the judging table
 DARWIN_FIN_DOC_URL=             # Onshape Part Studio URL (per account)
+DARWIN_ONSHAPE_WRITE=0          # explicit approval-time opt-in only
+DARWIN_ONSHAPE_WRITE_ISOLATED=0 # acknowledge a disposable/isolated workspace
+DARWIN_ONSHAPE_WRITE_TARGET_URL= # exact /w/ URL separately acknowledged for writes
 ANTHROPIC_API_KEY=
 DARWIN_LLM_PROVIDER=anthropic   DARWIN_MODEL_FAST=claude-haiku-5-5   DARWIN_MODEL_DEEP=claude-sonnet-5-5
 DARWIN_SPEND_CAP_TOTAL_USD=4.50 DARWIN_SPEND_CAP_RUN_USD=0.30

@@ -107,3 +107,57 @@ def test_server_evidence_approval_and_report_routes(monkeypatch, tmp_path):
     monkeypatch.setattr(server, "_summary", lambda run_id: dict(s, champion=dict(d, design_id="other")))
     rejected = client.post(f"/api/runs/{rid}/approve", json={"design_id": "design_1"})
     assert rejected.status_code == 409
+
+
+def test_commit_requires_approved_completed_champion(monkeypatch):
+    """The CAD adapter is reachable only through an exact champion approval."""
+    from fastapi.testclient import TestClient
+    from backend import server
+
+    champion = design()
+    summary_data = summary(champion=champion, design_space_id="fin_v1")
+    cad_calls = []
+    approval_calls = []
+
+    def commit_to_document(space, params):
+        cad_calls.append((space, params))
+        return SimpleNamespace(model_dump=lambda mode="json": {"geometry_key": "committed"})
+
+    monkeypatch.setattr(server, "_summary", lambda run_id: summary_data)
+    monkeypatch.setattr(server.W.cad, "commit_to_document", commit_to_document)
+
+    approval = {"record": None}
+
+    def load_approval(run_id, approved_design):
+        approval_calls.append((run_id, approved_design))
+        record = approval["record"]
+        if record is None or (record.get("design_id"), record.get("param_hash")) != (
+                approved_design.get("design_id"), approved_design.get("param_hash")):
+            return None
+        return record
+
+    monkeypatch.setattr(server.evidence, "load_approval", load_approval)
+    client = TestClient(server.app)
+    route = "/api/runs/run_1/commit"
+
+    # No approval record: the adapter must not be called.
+    assert client.post(route, json={"design_id": champion["design_id"]}).status_code == 409
+    assert cad_calls == []
+
+    # A request for another design is rejected before approval/CAD lookups.
+    assert client.post(route, json={"design_id": "not-the-champion"}).status_code == 409
+    assert cad_calls == [] and len(approval_calls) == 1
+
+    # A record bound to prior parameters is stale and cannot authorize this champion.
+    approval["record"] = {"design_id": champion["design_id"], "param_hash": "old-parameters"}
+    assert client.post(route, json={"design_id": champion["design_id"]}).status_code == 409
+    assert cad_calls == [] and approval_calls[-1] == ("run_1", champion)
+
+    approval["record"] = {"design_id": champion["design_id"], "param_hash": champion["param_hash"]}
+    response = client.post(route, json={"design_id": champion["design_id"]})
+    assert response.status_code == 200 and response.json()["geometry_key"] == "committed"
+    assert len(cad_calls) == 1 and cad_calls[0][1] == champion["params"]
+
+    summary_data["status"] = "running"
+    assert client.post(route, json={"design_id": champion["design_id"]}).status_code == 409
+    assert len(cad_calls) == 1
