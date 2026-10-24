@@ -89,7 +89,9 @@ This is a CAD defect, not a contract or code defect. The sanity check caught it
 with zero extra calls, which is what it is for — without it, the demo would have
 shown fins swept the wrong way with plausible-looking mass and area.
 
-## Bounds change
+## Sweep bound clarification
 
-`sweep_deg` minimum is **5 deg**, not 0, because 0 did not regenerate. The
-bounds are part of the frozen contract — see `cad/CONTRACT_REQUESTS.md`.
+The minimum remains **0 deg**. Darwin measures sweep from the spanwise axis, so
+0 deg is an unswept, right-angle fin. The earlier report that 0 did not
+regenerate came from the pre-fix complementary-angle sketch and is not a reason
+to narrow the design-space bound. See `cad/CONTRACT_REQUESTS.md`.
