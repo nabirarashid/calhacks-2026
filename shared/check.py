@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List
 
 from shared.contracts import (
-    CONTRACT_VERSION, BudgetStatus, DesignResult, DesignSpace, Goal, MetricInfo, Score, canonicalize,
+    CONTRACT_VERSION, BudgetStatus, DesignResult, DesignSpace, Goal, MetricInfo, Preset, Score, canonicalize,
     param_hash,
 )
 from shared.events import Event, validate_event
@@ -59,6 +59,10 @@ def main() -> int:
         [MetricInfo.model_validate(m) for m in json.loads((FIXTURES / "metric_catalog_fin.json").read_text())]
     except Exception as e:  # noqa: BLE001
         problems.append("metric_catalog_fin.json: %s" % e)
+    try:
+        [Preset.model_validate(m) for m in json.loads((FIXTURES / "presets.json").read_text())]
+    except Exception as e:  # noqa: BLE001
+        problems.append("presets.json: %s" % e)
 
     space = DesignSpace.model_validate_json((FIXTURES / "design_space_fin.json").read_text())
     design = DesignResult.model_validate_json((FIXTURES / "design_result_example.json").read_text())

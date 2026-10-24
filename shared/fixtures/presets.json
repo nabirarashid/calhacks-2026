@@ -1,0 +1,171 @@
+[
+  {
+    "label": "Stable & light",
+    "text": "Maximize this rocket fin's stability, keep drag low, keep it under 40 g, must fit a 3-inch body tube.",
+    "goal": {
+      "source_text": "Maximize this rocket fin's stability, keep drag low, keep it under 40 g, must fit a 3-inch body tube.",
+      "objectives": [
+        {
+          "metric": "stability_margin_cal",
+          "direction": "target",
+          "target": 2.5,
+          "tolerance": 1.0,
+          "weight": 0.5
+        },
+        {
+          "metric": "drag_n",
+          "direction": "minimize",
+          "target": null,
+          "tolerance": null,
+          "weight": 0.35
+        },
+        {
+          "metric": "fin_mass_total_g",
+          "direction": "minimize",
+          "target": null,
+          "tolerance": null,
+          "weight": 0.15
+        }
+      ],
+      "constraints": [
+        {
+          "ref": "fin_mass_total_g",
+          "op": "<=",
+          "value": 40.0,
+          "hard": true,
+          "label": "total fin mass <= 40 g"
+        },
+        {
+          "ref": "flutter_margin",
+          "op": ">=",
+          "value": 1.5,
+          "hard": true,
+          "label": "flutter-safe (default)"
+        },
+        {
+          "ref": "stability_margin_cal",
+          "op": ">=",
+          "value": 1.0,
+          "hard": true,
+          "label": "stable (default)"
+        },
+        {
+          "ref": "aft_overhang_mm",
+          "op": "<=",
+          "value": 0.0,
+          "hard": false,
+          "label": "no aft overhang"
+        }
+      ],
+      "fixed_params": {},
+      "context_overrides": {
+        "body_diameter_mm": 76.2
+      },
+      "assumptions": [
+        "'Maximize stability' -> target 2.5 cal: beyond ~3 cal a rocket weathercocks",
+        "'under 40 g' read as the TOTAL for all fins",
+        "3-inch tube = 76.2 mm body diameter"
+      ],
+      "parsed_by": "preset"
+    }
+  },
+  {
+    "label": "Min drag @ 1.5 cal",
+    "text": "Minimize drag while keeping at least 1.5 calibers of stability, and keep the fins flutter-safe.",
+    "goal": {
+      "source_text": "Minimize drag while keeping at least 1.5 calibers of stability, and keep the fins flutter-safe.",
+      "objectives": [
+        {
+          "metric": "drag_n",
+          "direction": "minimize",
+          "target": null,
+          "tolerance": null,
+          "weight": 0.7
+        },
+        {
+          "metric": "stability_margin_cal",
+          "direction": "target",
+          "target": 1.75,
+          "tolerance": 0.5,
+          "weight": 0.3
+        }
+      ],
+      "constraints": [
+        {
+          "ref": "stability_margin_cal",
+          "op": ">=",
+          "value": 1.5,
+          "hard": true,
+          "label": "stability >= 1.5 cal"
+        },
+        {
+          "ref": "flutter_margin",
+          "op": ">=",
+          "value": 1.5,
+          "hard": true,
+          "label": "flutter-safe (default)"
+        }
+      ],
+      "fixed_params": {},
+      "context_overrides": {},
+      "assumptions": [
+        "'flutter-safe' -> flutter velocity >= 1.5 x design velocity"
+      ],
+      "parsed_by": "preset"
+    }
+  },
+  {
+    "label": "Flutter-safe @ 200 m/s",
+    "text": "Make the fins flutter-safe up to 200 m/s with a 2 caliber margin, as light as possible.",
+    "goal": {
+      "source_text": "Make the fins flutter-safe up to 200 m/s with a 2 caliber margin, as light as possible.",
+      "objectives": [
+        {
+          "metric": "stability_margin_cal",
+          "direction": "target",
+          "target": 2.0,
+          "tolerance": 0.75,
+          "weight": 0.4
+        },
+        {
+          "metric": "fin_mass_total_g",
+          "direction": "minimize",
+          "target": null,
+          "tolerance": null,
+          "weight": 0.4
+        },
+        {
+          "metric": "drag_n",
+          "direction": "minimize",
+          "target": null,
+          "tolerance": null,
+          "weight": 0.2
+        }
+      ],
+      "constraints": [
+        {
+          "ref": "flutter_margin",
+          "op": ">=",
+          "value": 1.5,
+          "hard": true,
+          "label": "flutter-safe at 200 m/s"
+        },
+        {
+          "ref": "stability_margin_cal",
+          "op": ">=",
+          "value": 1.0,
+          "hard": true,
+          "label": "stable (default)"
+        }
+      ],
+      "fixed_params": {},
+      "context_overrides": {
+        "design_velocity_mps": 200.0
+      },
+      "assumptions": [
+        "design velocity raised to 200 m/s for drag and flutter"
+      ],
+      "parsed_by": "preset"
+    }
+  }
+]

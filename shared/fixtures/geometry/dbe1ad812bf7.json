@@ -1,0 +1,20 @@
+{
+  "geometry_key": "dbe1ad812bf7",
+  "status": "ready",
+  "source": "mock",
+  "stl_url": "/api/geometry/dbe1ad812bf7.stl",
+  "bbox_mm": [
+    0.0,
+    -1.95,
+    0.0,
+    99.416,
+    1.95,
+    68.0
+  ],
+  "volume_mm3": 10475.4,
+  "triangles": 12,
+  "onshape_calls": 1,
+  "regen_status": "OK",
+  "error": null,
+  "elapsed_ms": 0.28445599999926685
+}

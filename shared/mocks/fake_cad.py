@@ -1,0 +1,124 @@
+"""Fake CAD with the same signatures as cad.api (PLAN.md B.7 / B.10). Zero network.
+
+Writes a real ASCII STL of the square-edged plate (B.5 frame) to the geometry
+cache. Cache misses sleep FAKE_CAD_LATENCY seconds (default 1.7). About 5 % of
+geometry keys fail deterministically with regen_status "ERROR". Keeps a fake
+ledger that starts at 2400 calls with reserve 400.
+"""
+import json
+import os
+import threading
+import time
+import zipfile
+from pathlib import Path
+from typing import Dict, Optional
+
+from shared import fin_geometry
+from shared.contracts import (
+    DesignSpace, GeometryRef, OnshapeBudget, ParamValue, canonicalize, geometry_key,
+)
+
+_FIXTURE_GEOMETRY = Path(__file__).resolve().parent.parent / "fixtures" / "geometry"
+_lock = threading.Lock()
+_ledger = {"session": 0, "total": 0}
+START, RESERVE = 2400, 400
+
+
+def cache_dir() -> Path:
+    d = Path(os.environ.get("DARWIN_CACHE_DIR", ".darwin")) / "geometry"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _charge(n: int) -> bool:
+    with _lock:
+        if START - _ledger["total"] - n < RESERVE and os.environ.get("DARWIN_ALLOW_RESERVE") != "1":
+            return False
+        _ledger["session"] += n
+        _ledger["total"] += n
+        return True
+
+
+def budget_status() -> OnshapeBudget:
+    with _lock:
+        remaining = START - _ledger["total"]
+        unlocked = os.environ.get("DARWIN_ALLOW_RESERVE") == "1"
+        return OnshapeBudget(account_label="mock", calls_session=_ledger["session"],
+                             calls_ledger_total=_ledger["total"], remaining_estimate=remaining, reserve=RESERVE,
+                             reserve_unlocked=unlocked, hard_stop=(remaining <= RESERVE and not unlocked))
+
+
+def geometry_file(key: str) -> Optional[Path]:
+    for d in (cache_dir(), _FIXTURE_GEOMETRY):
+        p = d / ("%s.stl" % key)
+        if p.exists():
+            return p
+    return None
+
+
+def _read_ref(key: str) -> Optional[GeometryRef]:
+    for d in (cache_dir(), _FIXTURE_GEOMETRY):
+        side = d / ("%s.json" % key)
+        if side.exists() and (d / ("%s.stl" % key)).exists():
+            ref = GeometryRef.model_validate_json(side.read_text())
+            return ref.model_copy(update={"source": "cache", "onshape_calls": 0, "elapsed_ms": 0.0})
+    return None
+
+
+def build_geometry(space: DesignSpace, params: Dict[str, ParamValue], *, allow_network: bool = True) -> GeometryRef:
+    t0 = time.perf_counter()
+    p = canonicalize(space, params)
+    key = geometry_key(space, p)
+    cached = _read_ref(key)
+    if cached is not None:
+        return cached
+    if not allow_network:
+        return GeometryRef(geometry_key=key, status="skipped", source="none", error="network_disabled")
+    if not _charge(1):
+        return GeometryRef(geometry_key=key, status="skipped", source="none", error="onshape_budget_reserve")
+    time.sleep(float(os.environ.get("FAKE_CAD_LATENCY", "1.7")))
+    elapsed = (time.perf_counter() - t0) * 1000.0
+    if int(key, 16) % 20 == 0:
+        return GeometryRef(geometry_key=key, status="failed", source="mock", onshape_calls=1,
+                           regen_status="ERROR", error="mock regeneration failure", elapsed_ms=elapsed)
+    stl = fin_geometry.prism_stl(p, name=key)
+    d = fin_geometry.derived(dict(p, edge_profile="square"))
+    ref = GeometryRef(geometry_key=key, status="ready", source="mock", stl_url="/api/geometry/%s.stl" % key,
+                      bbox_mm=[round(x, 3) for x in fin_geometry.bbox_mm(p)], volume_mm3=round(d["volume_mm3"], 1),
+                      triangles=12, onshape_calls=1, regen_status="OK", elapsed_ms=elapsed)
+    out = cache_dir()
+    (out / ("%s.stl" % key)).write_text(stl)
+    (out / ("%s.json" % key)).write_text(ref.model_dump_json(indent=2))
+    return ref
+
+
+def commit_to_document(space: DesignSpace, params: Dict[str, ParamValue]) -> GeometryRef:
+    ref = build_geometry(space, params)
+    if ref.status == "skipped":
+        return ref
+    _charge(1)
+    return ref.model_copy(update={"onshape_calls": ref.onshape_calls + 1})
+
+
+def discover_design_space(doc_url: str, *, probe: bool = False) -> DesignSpace:
+    path = Path(__file__).resolve().parent.parent / "fixtures" / "design_space_fin.json"
+    space = DesignSpace.model_validate_json(path.read_text())
+    _charge(1 + (4 if probe else 0))
+    return space.model_copy(update={"id": "discovered_v1", "scorer": "", "discovered": True,
+                                    "notes": ["mock discovery: returned the fin_v1 parameters"]})
+
+
+def export_print_package(space: DesignSpace, params: Dict[str, ParamValue], out_dir: Path) -> Path:
+    p = canonicalize(space, params)
+    ref = build_geometry(space, p)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    zpath = out_dir / ("darwin_print_%s.zip" % ref.geometry_key)
+    card = ["# Darwin print card (mock)", "", "- design key: %s" % ref.geometry_key,
+            "- PLA, 0.2 mm layers, 100 % infill, no supports, lay flat",
+            "- params: %s" % json.dumps(p)]
+    with zipfile.ZipFile(zpath, "w") as z:
+        src = geometry_file(ref.geometry_key)
+        if src is not None:
+            z.write(src, "fin.stl")
+        z.writestr("print_card.md", "\n".join(card) + "\n")
+    return zpath

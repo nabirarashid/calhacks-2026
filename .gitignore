@@ -13,6 +13,7 @@ cad/SPIKE_raw/
 *.stl
 !demo/geometry/*.stl
 !shared/fixtures/*.stl
+!shared/fixtures/geometry/*.stl
 !cad/tests/fixtures/*.stl
 demo/video/*.mp4
 demo/video/*.mov

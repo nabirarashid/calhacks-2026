@@ -227,6 +227,8 @@ export interface RunConfig {
   profile: 'demo' | 'full' | 'bench';
 }
 
+export interface Preset { label: string; text: string; goal: Goal; }
+
 export interface CurvePoint { evals: number; best_aggregate: number; }
 
 export interface RunSummary {
@@ -315,7 +317,6 @@ export interface HealthResponse {
   contract: string;
   modes: { sim: string; cad: string; llm: string; mode: string };
 }
-export interface Preset { label: string; text: string; goal: Goal; }
 export interface ParseGoalRequest { text: string; design_space_id: string; }
 export interface StartRunRequest { goal: Goal; design_space_id: string; config: Partial<RunConfig>; }
 export interface StartRunResponse { run_id: string; }

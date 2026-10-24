@@ -278,7 +278,7 @@ class Goal(BaseModel):
 
 class Violation(BaseModel):
     ref: str; op: str; limit: float; actual: float
-    amount: float                              # normalized: |actual-limit| / max(|limit|, 1e-9)
+    amount: float                              # |actual-limit| / (typical_max-typical_min) of the metric, or (max-min) of the param
     hard: bool
 
 class Score(BaseModel):

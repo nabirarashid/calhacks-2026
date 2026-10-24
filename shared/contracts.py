@@ -106,8 +106,8 @@ class Violation(BaseModel):
     op: str
     limit: float
     actual: float
-    amount: float                              # normalized: |actual-limit| / max(|limit|, 1e-9)
-    hard: bool
+    amount: float                              # |actual-limit| / range; range = typical_max-typical_min
+    hard: bool                                 # of the metric, or max-min of the param
 
 
 class Score(BaseModel):
@@ -213,6 +213,18 @@ class AgentMessage(BaseModel):
     latency_ms: float = 0.0
 
 
+class ModelResult(BaseModel):                  # returned by backend call_model (and the mock provider)
+    data: Dict[str, object]                    # validated JSON output
+    raw_text: str
+    model: str
+    provider: str                              # "anthropic" | "mock" | "replay" | ...
+    tokens_in: int = 0
+    tokens_out: int = 0
+    cost_usd: float = 0.0
+    latency_ms: float = 0.0
+    cached: bool = False
+
+
 # ---------------------------------------------------------------- budgets
 
 class OnshapeBudget(BaseModel):
@@ -260,6 +272,12 @@ class RunConfig(BaseModel):
 
     def budget(self) -> int:
         return self.eval_budget if self.eval_budget is not None else self.population * self.generations
+
+
+class Preset(BaseModel):                       # GET /api/presets (demo goal chips)
+    label: str
+    text: str
+    goal: Goal
 
 
 class CurvePoint(BaseModel):

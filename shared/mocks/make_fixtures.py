@@ -5,7 +5,7 @@ from pathlib import Path
 from shared import fin_geometry
 from shared.contracts import (
     BudgetStatus, CadSource, Constraint, DesignResult, DesignSpace, GeometryRef, Goal, MetricInfo,
-    ModelBudget, Objective, OnshapeBudget, ParamSpec, Score, geometry_key, param_hash,
+    ModelBudget, Objective, OnshapeBudget, ParamSpec, Preset, Score, geometry_key, param_hash,
 )
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
@@ -129,6 +129,31 @@ BUDGET_EXAMPLE = BudgetStatus(
 )
 
 
+PRESETS = [
+    Preset(label="Stable & light", text=GOAL_EXAMPLE.source_text, goal=GOAL_EXAMPLE.model_copy(update={"parsed_by": "preset"})),
+    Preset(label="Min drag @ 1.5 cal",
+           text="Minimize drag while keeping at least 1.5 calibers of stability, and keep the fins flutter-safe.",
+           goal=Goal(source_text="Minimize drag while keeping at least 1.5 calibers of stability, and keep the fins flutter-safe.",
+                     objectives=[Objective(metric="drag_n", direction="minimize", weight=0.7),
+                                 Objective(metric="stability_margin_cal", direction="target", target=1.75,
+                                           tolerance=0.5, weight=0.3)],
+                     constraints=[Constraint(ref="stability_margin_cal", op=">=", value=1.5, label="stability >= 1.5 cal"),
+                                  Constraint(ref="flutter_margin", op=">=", value=1.5, label="flutter-safe (default)")],
+                     assumptions=["'flutter-safe' -> flutter velocity >= 1.5 x design velocity"], parsed_by="preset")),
+    Preset(label="Flutter-safe @ 200 m/s",
+           text="Make the fins flutter-safe up to 200 m/s with a 2 caliber margin, as light as possible.",
+           goal=Goal(source_text="Make the fins flutter-safe up to 200 m/s with a 2 caliber margin, as light as possible.",
+                     objectives=[Objective(metric="stability_margin_cal", direction="target", target=2.0,
+                                           tolerance=0.75, weight=0.4),
+                                 Objective(metric="fin_mass_total_g", direction="minimize", weight=0.4),
+                                 Objective(metric="drag_n", direction="minimize", weight=0.2)],
+                     constraints=[Constraint(ref="flutter_margin", op=">=", value=1.5, label="flutter-safe at 200 m/s"),
+                                  Constraint(ref="stability_margin_cal", op=">=", value=1.0, label="stable (default)")],
+                     context_overrides={"design_velocity_mps": 200.0},
+                     assumptions=["design velocity raised to 200 m/s for drag and flutter"], parsed_by="preset")),
+]
+
+
 def _dump(name: str, obj) -> None:
     path = FIXTURES / name
     if isinstance(obj, list):
@@ -147,6 +172,7 @@ def main() -> None:
     _dump("score_example.json", example_score())
     _dump("design_result_example.json", example_design())
     _dump("budget_example.json", BUDGET_EXAMPLE)
+    _dump("presets.json", PRESETS)
 
 
 if __name__ == "__main__":
