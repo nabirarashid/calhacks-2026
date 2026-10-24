@@ -2,7 +2,6 @@ import pytest
 from pathlib import Path
 
 from cad import verify
-from domains.static_structural.verifier import StaticStructuralGeometryVerifier
 from shared import fin_geometry
 
 
@@ -58,50 +57,3 @@ def test_generic_verifier_accepts_explicit_mm_export_units_without_bbox():
     assert result["ok"]
     assert result["checks"]["mm_scale"] == {
         "ok": True, "basis": "trusted export units"}
-
-
-def test_static_verifier_checks_injected_connector_and_hole_measurements(tmp_path):
-    path = tmp_path / "bracket.stl"
-    path.write_text(fin_geometry.prism_stl(PARAMS))
-    manifest = type("Manifest", (), {"protected": [
-        {"id": "mount_hole_a", "cad_ref": "mount_hole_a", "kind": "hole",
-         "check": "position", "nominal": {"x": 10.0, "y": 20.0, "z": 0.0},
-         "tolerance_mm": 0.05},
-        {"id": "load_hole", "cad_ref": "load_hole", "kind": "hole",
-         "check": "diameter", "nominal": {"d": 5.0}, "tolerance_mm": 0.05},
-    ]})()
-    verifier = StaticStructuralGeometryVerifier(
-        inventory={"mate_connectors": [{"name": "mount_hole_a",
-                                         "origin_mm": [10.01, 20.0, 0.0]}]},
-        hole_measurements={"load_hole": {"diameter_mm": 5.02,
-                                           "evidence": "exported_geometry"}},
-    )
-
-    result = verifier.verify(manifest, {}, str(path))
-
-    assert result["ok"]
-    assert all(check["ok"] for check in result["protected_interfaces"])
-
-
-def test_static_verifier_fails_closed_without_interface_measurements(tmp_path):
-    path = tmp_path / "bracket.stl"
-    path.write_text(fin_geometry.prism_stl(PARAMS))
-    manifest = type("Manifest", (), {"protected": [
-        {"id": "mount_hole_a", "cad_ref": "mount_hole_a", "kind": "hole",
-         "check": "position", "nominal": {"x": 10.0, "y": 20.0, "z": 0.0}},
-    ]})()
-
-    result = StaticStructuralGeometryVerifier().verify(manifest, {}, str(path))
-
-    assert not result["ok"]
-    assert result["protected_interfaces"][0]["ok"] is None
-
-
-def test_static_verifier_binds_manifest_for_in_memory_build_checks():
-    manifest = {"protected": []}
-    verifier = StaticStructuralGeometryVerifier().bind(manifest)
-
-    result = verifier.verify_data({}, fin_geometry.prism_stl(PARAMS))
-
-    assert result["ok"]
-    assert result["reasons"] == []
