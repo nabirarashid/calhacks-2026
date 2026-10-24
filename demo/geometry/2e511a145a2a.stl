@@ -1,0 +1,86 @@
+solid Mesh
+  facet normal 0 1 0
+    outer loop
+      vertex 61.5 1.4 -1.38778e-14
+      vertex 0 1.4 0
+      vertex 73.2266 1.4 69
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex 0 1.4 0
+      vertex 26.4866 1.4 69
+      vertex 73.2266 1.4 69
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 0 -1.4 0
+      vertex 61.5 -1.4 -1.38778e-14
+      vertex 26.4866 -1.4 69
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 61.5 -1.4 -1.38778e-14
+      vertex 73.2266 -1.4 69
+      vertex 26.4866 -1.4 69
+    endloop
+  endfacet
+  facet normal 0.985864 0 -0.167548
+    outer loop
+      vertex 73.2266 -1.4 69
+      vertex 61.5 -1.4 -1.38778e-14
+      vertex 73.2266 1.4 69
+    endloop
+  endfacet
+  facet normal 0.985864 0 -0.167548
+    outer loop
+      vertex 61.5 -1.4 -1.38778e-14
+      vertex 61.5 1.4 -1.38778e-14
+      vertex 73.2266 1.4 69
+    endloop
+  endfacet
+  facet normal -2.25655e-16 0 -1
+    outer loop
+      vertex 61.5 -1.4 -1.38778e-14
+      vertex 0 -1.4 0
+      vertex 61.5 1.4 -1.38778e-14
+    endloop
+  endfacet
+  facet normal -2.25655e-16 0 -1
+    outer loop
+      vertex 0 -1.4 0
+      vertex 0 1.4 0
+      vertex 61.5 1.4 -1.38778e-14
+    endloop
+  endfacet
+  facet normal -0.93358 0 0.358368
+    outer loop
+      vertex 0 -1.4 0
+      vertex 26.4866 -1.4 69
+      vertex 0 1.4 0
+    endloop
+  endfacet
+  facet normal -0.93358 0 0.358368
+    outer loop
+      vertex 26.4866 -1.4 69
+      vertex 26.4866 1.4 69
+      vertex 0 1.4 0
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 26.4866 -1.4 69
+      vertex 73.2266 -1.4 69
+      vertex 26.4866 1.4 69
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 73.2266 -1.4 69
+      vertex 73.2266 1.4 69
+      vertex 26.4866 1.4 69
+    endloop
+  endfacet
+endsolid Mesh
