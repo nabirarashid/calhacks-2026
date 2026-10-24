@@ -85,3 +85,37 @@ Not a request, a constraint (details in `sim/FEA_SPIKE.md`, G-4):
   normal outcome, not an error, and should not produce an `error` event either.
 - Champion verification is ~5–15 s at 4–5 mm. Budget the 60 s demo run for it,
   or verify the champion only.
+
+---
+
+## 4. `ParamSemantics.role` is never enforced — "fixed" and "protected" do nothing
+
+**Status: open. Found Sat ~13:00. Matters for the Phase 2 onboarding review UI.**
+
+The manifest gives every parameter a `role: editable | fixed | protected`, which
+is the field that *reads* as "which parameters Darwin may change". No code reads
+it. `backend/projects.py:56` reads `semantics`, but only `.confirmed`, for
+maturity gating.
+
+**Runtime proof** (fin manifest, `thickness` flipped to `role="fixed"`):
+
+```
+thickness role now: fixed
+optimizer still sees bounds: 2.0 .. 5.0
+a proposal of thickness=4.7 canonicalizes to: 4.7
+```
+
+**Why it is harmless today and a trap tomorrow.** `edge_profile` is `role=fixed`
+*and* `choices=["square"]` in `projects/fin_reference/r1.json`, so the bound
+pins it and the role is merely consistent by hand. But in the Phase 2 review UI
+an engineer who marks a parameter "fixed" will expect the optimizer to leave it
+alone. It won't. Worse, confirming that semantics raises the project's maturity,
+so the review is *recorded as approval* of a constraint that is not enforced.
+That is the exact failure safety rule 5 ("approval binds the reviewed state")
+exists to prevent.
+
+**Suggested fix (W-C's call).** When a manifest becomes the optimizer's
+`DesignSpace`, collapse every `fixed` or `protected` parameter to a single value
+(its default, or the value the engineer approved), so it is enforced by the same
+`canonicalize` path that already enforces bounds and `goal.fixed_params`. A test
+that flips a role and asserts the proposal is clamped would pin it.
