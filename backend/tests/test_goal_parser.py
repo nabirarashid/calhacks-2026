@@ -106,3 +106,21 @@ def test_invented_pins_are_dropped_and_stated_pins_kept():
     stated = dict(data, fixed_params=[{"name": "aoa_deg", "value": "8"}])
     g2 = to_goal(stated, text + " Start with the angle at 8 degrees.", space, cat)
     assert g2.fixed_params == {"aoa_deg": 8.0}
+
+
+def test_no_llm_fallback_for_the_wing_reads_numbers_and_editable(monkeypatch):
+    monkeypatch.setenv("DARWIN_LLM_PROVIDER", "replay")              # replay with an empty cache = no LLM
+    monkeypatch.setenv("DARWIN_SIM", "real")
+    from backend.agents.goal_parser import parse_goal
+    from backend.wiring import Wiring
+    w = Wiring()
+    space = w.resolve("rear_wing")
+    g, res = parse_goal("More downforce without going over 13.5 N of drag. You can change the angle and span.",
+                        space, w.catalog(space.scorer), w.presets)
+    assert res is None and g.parsed_by == "fallback"
+    assert [o.metric for o in g.objectives] == ["downforce_n"]
+    assert ("drag_n", "<=", 13.5) in [(c.ref, c.op, c.value) for c in g.constraints]
+    assert g.editable == ["aoa_deg", "span_mm"] and "Darwin may change" in g.assumptions[0]
+    g2, _ = parse_goal("Cut drag but keep at least 130 N of downforce.", space, w.catalog(space.scorer), w.presets)
+    assert [o.metric for o in g2.objectives] == ["drag_n"]
+    assert ("downforce_n", ">=", 130.0) in [(c.ref, c.op, c.value) for c in g2.constraints]

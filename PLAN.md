@@ -356,6 +356,14 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 - **Ablation:** `DARWIN_KNOWLEDGE=off` drops the file from the prompt (used by the proof bench).
 
 ### B.9 Models and budgets
+
+> **16:05 BLOCKER: the Anthropic API refuses every call** ("You have reached your specified API usage
+> limits … regain access on 2026-11-01"). That's the Console's monthly spend cap. The account owner
+> can raise it in Console → Settings → Limits if prepaid balance remains; otherwise we need another
+> provider (one branch in `backend/llm.py` `call_model`). Known spend: W-C laptop $0.68 + W-B laptop
+> $0.35 = $1.03 (local ledgers are per laptop). Without an LLM the loop runs its rules planner (not
+> smart), and the replays of live sessions still work.
+
 - **Models:** plan and analyze use **Sonnet 5.5**; prompt parsing uses **Haiku 5.5**.
   - About 2 Sonnet calls per step, 8 steps → **about $0.40 per session**.
   - Caps: $0.60 per session, $4.50 total (local ledger).
@@ -378,7 +386,7 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 
 ## Part C: The four sections
 
-**Progress (Sat 15:50):** done: A1, A3, B1, B2, B3, B4, C1, C2, C3. The investigator runs end to end on the
+**Progress (Sat 16:10):** done: A1, A3, B1, B2, B3, B4, C1, C2, C3; C4 (live-verified on Onshape, rules planner). The investigator runs end to end on the
 real rear-wing solver (CP-C's terminal criterion is met). **Not yet visible in git:** anything from
 W-A (A2 wing Part Studio) or W-D (D1 extension). W-C did A3 (`cad/variables.py`).
 
@@ -501,12 +509,16 @@ The structural/FEA work is parked: leave the files, stop work.
 - [x] **C3 (by 19:00) Goal parser** ✅ *done 15:45 (W-C): explicit phrases decide, the LLM only fills unusual wording, invented pins dropped* emits `editable` ("you can change the angle, span and flap"
   → `aoa_deg`, `span_mm`, `flap_angle_deg`, `flap_chord_frac`) and holds everything else
   fixed. Assumptions are listed for the user.
-- [ ] **C4 (by 21:30) Session API** (B.6), with `cad.variables` on each accepted step, the
+- [x] **C4 (by 21:30) Session API** ✅ *done 16:20 (W-C): live on the disposable copy with real Onshape writes (3 accepted steps written, before/after versions, Onshape == champion, 21 calls). Pending: the smart planner needs a working LLM (B.9 blocker); the visible morph needs the wing Part Studio (A2)* (B.6), with `cad.variables` on each accepted step, the
   before/after versions, and evidence/report for sessions.
-- [ ] **C5 (by 01:00) Proof bench** on the wing, same simulation budget (20), 3 goals × 3 seeds:
+- [ ] **C5 (by 01:00) Proof bench** on the wing, same simulation budget (20), 3 seeds per goal:
   - Darwin, CMA-ES, random, Darwin with `DARWIN_KNOWLEDGE=off`
-  - sims-to-target and the final result
-  - output `demo/bench_wing.json`
+  - **Lead the ablation with prediction accuracy**, then sims-to-target and the final result. W-B's pilot
+    (Sat 16:00): accuracy 0.93 with principles vs 0.77 without, but final downforce tied (133.7 vs
+    133.2 N), because both runs found the same box-corner move (span and endplates to max).
+  - **Goals:** the demo goal, plus at least one where the easy lever is gone (e.g. span fixed), so the
+    agent has to work the flap/AoA lift budget the principles cover, and results can separate.
+  - Output `demo/bench_wing.json`. Needs a working LLM (see B.9).
 - [ ] **C6 (by 02:00)** Recordings: a wing session and a fin session, both replayable with no
   keys. The old population loop stays as the baseline engine.
 

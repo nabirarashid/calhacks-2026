@@ -157,7 +157,18 @@ def fallback_goal(text: str, presets: List[Preset], reason: str,
     g.source_text = text
     g.parsed_by = "fallback"
     g.assumptions = ["Goal parser unavailable (%s); used preset '%s'. Edit before running." % (reason, best.label)]
-    m = re.search(r"(\d+(?:\.\d+)?)\s*g(?:rams?)?\b", text.lower())
+    info = {m.name: m for m in catalog or []}
+    low = text.lower()
+    for c in g.constraints:          # "15 N of drag", "120 N of downforce": the user's numbers replace the preset's
+        mi = info.get(c.ref)
+        if mi is None or not mi.unit or mi.unit == "g":
+            continue
+        word = re.escape(c.ref.split("_")[0])
+        hit = re.search(r"(\d+(?:\.\d+)?)\s*%s\b\s*(?:of\s+)?%s" % (re.escape(mi.unit.lower()), word), low)
+        if hit:
+            c.value = float(hit.group(1))
+            c.label = "%s %s %s %s" % (c.ref, c.op, hit.group(1), mi.unit)
+    m = re.search(r"(\d+(?:\.\d+)?)\s*g(?:rams?)?\b", low)
     grams = {c.name: c for c in catalog or [] if c.unit == "g"}
     for c in g.constraints:
         if m and c.op == "<=" and (c.ref in grams or (catalog is None and c.ref.endswith("_g"))):
@@ -182,5 +193,9 @@ def parse_goal(text: str, space: DesignSpace, catalog: List[MetricInfo], presets
                              max_tokens=2000, effort="low", budget=budget, think=False,
                              validate=lambda d: to_goal(d, text, space, catalog))
     except (llm.LLMUnavailable, llm.BudgetExceeded) as e:
-        return fallback_goal(text, presets, str(e), catalog), None
+        presets = list(presets) + list(getattr(_packs.get(space.id), "presets", []))
+        g = fallback_goal(text, presets, str(e), catalog)
+        g.editable, note = resolve_editable(text, space, None, g.fixed_params)   # same C3 rules as the LLM path
+        g.assumptions = [note] + g.assumptions
+        return g, None
     return to_goal(res.data, text, space, catalog), res

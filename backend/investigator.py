@@ -12,6 +12,7 @@ Terminal use (CP-C):  python -m backend.investigator --project rear_wing [--step
 """
 import argparse
 import logging
+import re
 import threading
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -481,7 +482,8 @@ class Investigator:
         if self.version is not None and self.current is not None and self.seed is not None:
             obj = self.goal.objectives[0].metric if self.goal.objectives else None
             gain = _pct(self.seed.score.metrics.get(obj, 0.0), self.current.score.metrics.get(obj, 0.0)) if obj else 0
-            self._version("Darwin: %s %+.0f%%" % (obj or "result", gain))
+            label = re.sub(r"_(n|mm|deg|g|cal)$", "", obj).replace("_", " ") if obj else "result"
+            self._version("Darwin: %s %+.0f%%" % (label, gain))
         self.summary.finished_at = _now_iso()
         self.summary.champion = self.current
         self.summary.seed_design = self.seed

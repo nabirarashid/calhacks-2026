@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 from typing import Dict, List
 
+from shared.contracts import Constraint, Goal, Objective, Preset
 from shared.manifest import CadInventory, SourceRef
 
 _HERE = Path(__file__).resolve().parent
@@ -70,6 +71,35 @@ class AeroPack:
         if os.environ.get("DARWIN_KNOWLEDGE", "on").lower() == "off":
             return []
         return parse_principles((_HERE / "principles.md").read_text())
+
+    # Fallback goals when no LLM is available (the goal parser picks the nearest by words and reads
+    # numbers like "15 N of drag" from the prompt). Also usable as panel suggestion chips.
+    presets = [
+        Preset(label="More downforce, drag-limited",
+               text="More downforce without going over 15 N of drag at 25 m/s.",
+               goal=Goal(source_text="More downforce without going over 15 N of drag at 25 m/s.",
+                         objectives=[Objective(metric="downforce_n", direction="maximize")],
+                         constraints=[Constraint(ref="drag_n", op="<=", value=15.0, label="Drag <= 15 N"),
+                                      Constraint(ref="stall_margin_deg", op=">=", value=0.5,
+                                                 label="Keep clear of stall")],
+                         parsed_by="preset")),
+        Preset(label="Same downforce, less drag",
+               text="Cut drag while keeping at least 120 N of downforce.",
+               goal=Goal(source_text="Cut drag while keeping at least 120 N of downforce.",
+                         objectives=[Objective(metric="drag_n", direction="minimize")],
+                         constraints=[Constraint(ref="downforce_n", op=">=", value=120.0, label="Downforce >= 120 N"),
+                                      Constraint(ref="stall_margin_deg", op=">=", value=0.5,
+                                                 label="Keep clear of stall")],
+                         parsed_by="preset")),
+        Preset(label="Most efficient wing",
+               text="Maximize downforce-to-drag efficiency with at least 100 N of downforce.",
+               goal=Goal(source_text="Maximize downforce-to-drag efficiency with at least 100 N of downforce.",
+                         objectives=[Objective(metric="l_over_d", direction="maximize")],
+                         constraints=[Constraint(ref="downforce_n", op=">=", value=100.0, label="Downforce >= 100 N"),
+                                      Constraint(ref="stall_margin_deg", op=">=", value=0.5,
+                                                 label="Keep clear of stall")],
+                         parsed_by="preset")),
+    ]
 
     def signature_match(self, inv: CadInventory) -> float:
         want = {"aoa_deg", "span_mm", "chord_mm", "flap_angle_deg"}

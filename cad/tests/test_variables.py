@@ -179,3 +179,27 @@ def test_versions_and_element_lookup(cad):
     assert variables.create_version(URL, "Before Darwin") == "ver1" and cad.versions == ["Before Darwin"]
     assert variables.resolve_doc("https://cad.onshape.com/documents/d0c/w/w0r", cad) == ("d0c", "w0r", "e1e")
     assert variables.format_expression(8, "deg") == "8 deg" and variables.format_expression(0.3, "") == "0.3"
+
+
+def test_ensure_variables_creates_only_missing_ones_at_the_top(cad, monkeypatch):
+    rolls = []
+    real_request = cad.request
+
+    def request(method, path, purpose, **kw):
+        if path.endswith("/rollback"):
+            cad.ledger.n += 1
+            rolls.append(kw["json_body"]["rollbackIndex"])
+            return Resp({"rollbackIndex": kw["json_body"]["rollbackIndex"]})
+        if path.endswith("/features"):
+            cad.ledger.n += 1
+            cad.features["features"].insert(len(rolls) and 0, kw["json_body"]["feature"])
+            return Resp({"featureState": {"featureStatus": "OK"}, "sourceMicroversion": "mvx"})
+        return real_request(method, path, purpose, **kw)
+
+    monkeypatch.setattr(cad, "request", request)
+    made = variables.ensure_variables(URL, [("aoa_deg", "deg", 6), ("gurney_mm", "mm", 5), ("gap_frac", "", 0.02)])
+    assert made == ["gurney_mm", "gap_frac"] and rolls == [0, -1]
+    v = variables.parse_variables(cad.features)
+    assert v["gurney_mm"]["expression"] == "5 mm" and v["gurney_mm"]["type"] == "LENGTH"
+    assert v["gap_frac"]["expression"] == "0.02" and v["gap_frac"]["type"] == "NUMBER"
+    assert variables.ensure_variables(URL, [("aoa_deg", "deg", 6)]) == []

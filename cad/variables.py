@@ -270,6 +270,44 @@ def apply_values(doc_url: str, params: Mapping[str, ParamValue], units: Mapping[
         return _fail(key, "%s: %s" % (type(e).__name__, e), calls(), started)
 
 
+def ensure_variables(doc_url: str, specs: List[Tuple[str, str, ParamValue]]) -> List[str]:
+    """Create any missing Variable features at the TOP of the Part Studio: specs = [(name, unit, default)].
+
+    Optional setup shortcut for a new Part Studio (cad/WING_PARTSTUDIO.md step 1 does the same by hand):
+    afterwards the geometry only has to reference #name. Moves the rollback bar to 0, inserts the
+    features (built by build_variable_feature), restores the bar (cad/SPIKE.md). Returns the names created.
+    Raises on refusal or HTTP failure: this is a setup tool, not a demo path.
+    """
+    if not write_allowed(doc_url):
+        raise ValueError("write_not_allowed: document is not listed in DARWIN_ONSHAPE_WRITE_DOCS")
+    api = _api()
+    if api._get_ledger().hard_stop():
+        raise ValueError("onshape_budget_reserve")
+    c = api._get_client()
+    did, wid, eid = resolve_doc(doc_url, c)
+    base = "/partstudios/d/%s/w/%s/e/%s/features" % (did, wid, eid)
+    existing = parse_variables(c.get_features(did, wid, eid, purpose="setup"))
+    missing = [(n, u, d) for n, u, d in specs if n not in existing]
+    if not missing:
+        return []
+    payloads = [build_variable_feature(n, d, u) for n, u, d in missing]     # validates names/values first
+    roll = lambda idx: c.request("POST", base + "/rollback", "setup",  # noqa: E731
+                                 path_template="/partstudios/d/{did}/w/{wid}/e/{eid}/features/rollback",
+                                 headers={"Content-Type": "application/json"}, json_body={"rollbackIndex": idx})
+    roll(0)
+    try:
+        f = c.get_features(did, wid, eid, purpose="setup")
+        source_mv = f["sourceMicroversion"]
+        for body in payloads:
+            body = dict(body, serializationVersion=f["serializationVersion"], sourceMicroversion=source_mv)
+            resp = c.request("POST", base, "setup", path_template="/partstudios/d/{did}/w/{wid}/e/{eid}/features",
+                             headers={"Content-Type": "application/json"}, json_body=body).json()
+            source_mv = resp.get("sourceMicroversion") or source_mv
+    finally:
+        roll(-1)
+    return [n for n, _, _ in missing]
+
+
 def create_version(doc_url: str, name: str) -> Optional[str]:
     """Named version of the workspace ("Before Darwin", "Darwin: ..."). 1 call. Returns the version id or None."""
     if not write_allowed(doc_url) or _api()._get_ledger().hard_stop():
@@ -285,4 +323,4 @@ def create_version(doc_url: str, name: str) -> Optional[str]:
 
 
 __all__ = ["VALUE_PARAM", "resolve_doc", "write_allowed", "parse_literal", "parse_variables", "format_expression",
-           "build_variable_feature", "list_variables", "apply_values", "create_version"]
+           "build_variable_feature", "list_variables", "apply_values", "ensure_variables", "create_version"]
