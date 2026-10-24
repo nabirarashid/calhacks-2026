@@ -65,6 +65,7 @@ class RunController:
         self.stop_flag = threading.Event()
         self.pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="run-%s" % self.run_id)
         self.critic_futures = []  # type: List[Future]
+        self.strategist_future = None  # type: Optional[Future]
         self.last_critic_why = None  # type: Optional[str]
         self.geo_q = queue.Queue()  # type: queue.Queue
         self.builds = 0
@@ -85,11 +86,13 @@ class RunController:
         self.ch.emit(type_, payload)
 
     def message(self, agent: str, kind: str, summary: str, body: str = "", refs: Optional[List[str]] = None,
-                res: Optional[ModelResult] = None, generation: Optional[int] = None) -> None:
+                res: Optional[ModelResult] = None, generation: Optional[int] = None,
+                model: Optional[str] = None) -> None:
         self.emit("agent_message", AgentMessageEvent(message=AgentMessage(
             message_id=uuid.uuid4().hex[:10], run_id=self.run_id,
             generation=self.history.generation if generation is None else generation,
-            agent=agent, kind=kind, model=res.model if res else "rules", summary=summary[:300], body=body[:2000],  # type: ignore[arg-type]
+            agent=agent, kind=kind, model=model or (res.model if res else "rules"), summary=summary[:300],  # type: ignore[arg-type]
+            body=body[:2000],
             refs=refs or [], tokens_in=res.tokens_in if res else 0, tokens_out=res.tokens_out if res else 0,
             cost_usd=res.cost_usd if res else 0.0, latency_ms=res.latency_ms if res else 0.0)))
 
@@ -163,7 +166,9 @@ class RunController:
             propose_ms = (time.perf_counter() - t0) * 1000.0
             self._evaluate_and_publish(batch, propose_ms / max(1, len(batch)))
             self._after_generation(g, sens, t0)
-            if self.history.stagnation >= cfg.early_stop_patience and g < cfg.generations - 1:
+            # early stop only in the last quarter, so a plateau never ends a run before the search had a chance
+            if self.history.stagnation >= cfg.early_stop_patience and g + 1 >= 0.75 * cfg.generations \
+                    and g < cfg.generations - 1:
                 self.message("system", "status", "Early stop: no improvement >= %.3f for %d generations."
                              % (cfg.min_improvement, cfg.early_stop_patience))
                 break
@@ -311,17 +316,26 @@ class RunController:
         fresh_sens = self._sensitivity() if h.champion is not None else sens
         self.critic_futures.append(self.pool.submit(self._critic, snap, fresh_sens, g))
 
-        # strategist: LLM every 3rd generation or on stagnation; rules otherwise
+        # strategist: LLM every 3rd generation or on stagnation, async (it never blocks a proposal);
+        # its directive is adopted at the first generation boundary after it returns. Rules otherwise.
         old = h.directive
-        if g % 3 == 2 or h.stagnation >= 2:
-            d, res = strategist.strategize(h, self.N, budget=self.llm_budget)
-        else:
-            d, res = strategist.rules_directive(h, self.N), None
+        d, res = strategist.rules_directive(h, self.N), None
+        f = self.strategist_future
+        if f is not None and f.done():
+            self.strategist_future = None
+            try:
+                d, res = f.result()
+            except Exception as e:  # noqa: BLE001
+                log.warning("strategist failed: %s", e)
+        if d.mode == "refine" or h.generations - g - 1 <= 2:
+            d = strategist.rules_directive(h, self.N) if res is None else d
         h.directive = d
         if res is not None or d.mode != old.mode:
             self.message("strategist", "directive", "%s: %s" % (d.mode, d.reason),
                          body="n_explore=%d, step_scale=%.2f, focus=%s" % (d.n_explore, d.step_scale,
                                                                            ", ".join(d.focus_params) or "-"), res=res)
+        if self.strategist_future is None and (g % 3 == 1 or h.stagnation >= 2) and g < cfg.generations - 2:
+            self.strategist_future = self.pool.submit(strategist.strategize, snap, self.N, self.llm_budget)
 
         self._baseline_progress(evals)
         pareto_ids = [d.design_id for d in h.designs if d.pareto_rank == 0]
@@ -348,7 +362,8 @@ class RunController:
             self.message("critic", "insight", why, body=body, refs=critic.champion_ids(snap), res=res, generation=g)
             for s in data.get("suspicious", [])[:2]:
                 self.message("critic", "warning", "%s: %s" % (s.get("design_id", "?"), s.get("reason", "")),
-                             refs=[s["design_id"]] if s.get("design_id") in snap.by_id else [], generation=g)
+                             refs=[s["design_id"]] if s.get("design_id") in snap.by_id else [], generation=g,
+                             model=res.model if res else "rules")
         except Exception as e:  # noqa: BLE001 — the critic is advisory
             log.warning("critic failed: %s", e)
 
@@ -422,8 +437,11 @@ class RunController:
                 self.baseline_results[m] = f.result(timeout=120)
             except Exception as e:  # noqa: BLE001
                 self.error("backend", "baseline_failed", "%s baseline: %s" % (m, e))
-        if self.baseline_results:
-            self._baseline_progress(self.budget_evals)
+        # matched budget: baselines are judged at exactly the evaluations the agent used
+        matched = len(h.designs)
+        if self.baseline_results and (not self.curves.get(cfg.baselines[0]) or
+                                      self.curves[cfg.baselines[0]][-1].evals != matched):
+            self._baseline_progress(matched)
         for f in self.critic_futures:
             try:
                 f.result(timeout=40)
@@ -441,7 +459,8 @@ class RunController:
             deadline = time.time() + 45
             while self.geo_q.unfinished_tasks and time.time() < deadline:
                 time.sleep(0.1)
-        baseline_best = {m: max(r, key=lambda d: d.score.aggregate) for m, r in self.baseline_results.items()}
+        baseline_best = {m: max(r[:matched], key=lambda d: d.score.aggregate)
+                         for m, r in self.baseline_results.items() if r}
         if champ is not None and cfg.profile != "bench":
             rep, res = reporter.report(h, hifi, baseline_best, self.last_critic_why or "", budget=self.llm_budget)
             self.message("reporter", "report", rep.get("headline") or "Final report",

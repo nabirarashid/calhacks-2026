@@ -88,7 +88,7 @@ def parse_goal(text: str, space: DesignSpace, catalog: List[MetricInfo], presets
     try:
         res = llm.call_model("goal_parser", system_prompt("goal_parser"),
                              user_message("Parse this goal.", block), goal_schema(space, catalog),
-                             max_tokens=2000, effort="low", budget=budget,
+                             max_tokens=2000, effort="low", budget=budget, think=False,
                              validate=lambda d: to_goal(d, text, space, catalog))
     except (llm.LLMUnavailable, llm.BudgetExceeded) as e:
         return fallback_goal(text, presets, str(e)), None

@@ -20,6 +20,7 @@ def report(history: RunHistory, hifi: Optional[Score], baselines: Dict[str, Desi
         "critic": critic_why,
         "high_fidelity": {"metrics": {m: hifi.metrics.get(m) for m in metrics}, "warnings": hifi.warnings} if hifi else None,
         "baselines_same_budget": {k: compact_design(v, metrics) for k, v in baselines.items()},
+        "baseline_note": "baselines are scored on exactly the same number of evaluations as the agent",
         "evaluations": len(history.designs),
     }
     fallback = {"headline": "Champion %s found in %d evaluations." % (champ.design_id if champ else "-", len(history.designs)),

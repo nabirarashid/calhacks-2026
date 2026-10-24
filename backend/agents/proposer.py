@@ -41,6 +41,6 @@ def propose(history: RunHistory, n: int, directive: Directive, sens: Dict[str, D
     block = build_block(history, n, directive, sens)
     res = llm.call_model("proposer", system_prompt("proposer"),
                          user_message("Propose %d new designs for generation %d." % (n, history.generation), block),
-                         proposer_schema(history.space), max_tokens=3000, effort="low", budget=budget,
+                         proposer_schema(history.space), max_tokens=3000, effort="low", budget=budget, think=False,
                          validate=_validate)
     return _validate(res.data)[:n], str(res.data.get("hypothesis", "")), res

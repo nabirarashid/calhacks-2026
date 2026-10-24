@@ -39,7 +39,7 @@ def strategize(history: RunHistory, population: int, budget: Optional[llm.RunLLM
     try:
         res = llm.call_model("strategist", system_prompt("strategist"),
                              user_message("Choose the search mode for the next generation.", block),
-                             strategist_schema(history.space), max_tokens=1500, effort="low", budget=budget,
+                             strategist_schema(history.space), max_tokens=1500, effort="low", budget=budget, think=False,
                              validate=lambda d: Directive(source="llm", **d))
     except (llm.LLMUnavailable, llm.BudgetExceeded):
         return rules_directive(history, population), None

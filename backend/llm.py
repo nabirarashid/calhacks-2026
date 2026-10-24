@@ -144,7 +144,7 @@ def extract_json(text: str) -> Optional[Dict[str, Any]]:
 # ---------------------------------------------------------------- cache
 
 def _cache_key(model: str, system: str, user: str, schema: Optional[dict]) -> str:
-    blob = json.dumps([model, system, user, schema], sort_keys=True)
+    blob = json.dumps([model, system, user, schema], sort_keys=True)  # thinking mode does not change the answer contract
     return hashlib.sha1(blob.encode("utf-8")).hexdigest()
 
 
@@ -170,7 +170,7 @@ def _anthropic_client(timeout_s: float):
 
 
 def _complete(provider: str, role: str, system: str, user: str, schema: Optional[dict], model: str,
-              max_tokens: int, effort: str, timeout_s: float) -> Tuple[str, int, int]:
+              max_tokens: int, effort: str, timeout_s: float, think: bool = True) -> Tuple[str, int, int]:
     """One raw completion. Returns (text, tokens_in, tokens_out). Raises LLMUnavailable."""
     if provider == "mock":
         from shared.mocks import fake_llm
@@ -181,10 +181,14 @@ def _complete(provider: str, role: str, system: str, user: str, schema: Optional
         output_config = {"effort": effort}  # type: Dict[str, Any]
         if schema is not None:
             output_config["format"] = {"type": "json_schema", "schema": schema}
+        extra = {}  # type: Dict[str, Any]
+        # Haiku 5.5 accepts thinking "disabled" at effort <= high; other current models 400 on it.
+        if not think and model.startswith("claude-haiku-5") and effort in ("low", "medium", "high"):
+            extra["thinking"] = {"type": "disabled"}
         try:
             resp = _anthropic_client(timeout_s).with_options(timeout=timeout_s).messages.create(
                 model=model, max_tokens=max(max_tokens, MIN_MAX_TOKENS), system=system,
-                messages=[{"role": "user", "content": user}], output_config=output_config)
+                messages=[{"role": "user", "content": user}], output_config=output_config, **extra)
         except anthropic.APIStatusError as e:
             raise LLMUnavailable("%s: HTTP %s" % (type(e).__name__, e.status_code))
         except anthropic.APIConnectionError as e:   # includes APITimeoutError
@@ -202,16 +206,18 @@ def _complete(provider: str, role: str, system: str, user: str, schema: Optional
 # ---------------------------------------------------------------- the one function
 
 def call_model(role: str, system: str, user: str, schema: Optional[dict] = None, *, model: Optional[str] = None,
-               max_tokens: int = 2000, effort: str = "low", timeout_s: float = 25.0,
+               max_tokens: int = 2000, effort: str = "low", timeout_s: float = 40.0,
                validate: Optional[Callable[[Dict[str, Any]], Any]] = None,
-               budget: Optional[RunLLMBudget] = None) -> ModelResult:
+               budget: Optional[RunLLMBudget] = None, think: bool = True) -> ModelResult:
     """Call the configured provider and return validated JSON in ModelResult.data.
 
     `validate(data)` may raise to reject the output (it is retried with the error
-    appended). Raises BudgetExceeded or LLMUnavailable; callers degrade to rules.
+    appended). `think=False` turns Haiku thinking off (latency; critical-path roles),
+    unless DARWIN_FAST_THINKING=1. Raises BudgetExceeded or LLMUnavailable.
     """
     provider = provider_name()
     model = model or (fast_model() if provider != "mock" else "mock")
+    think = think or os.environ.get("DARWIN_FAST_THINKING") == "1"
     use_cache = provider == "replay" or os.environ.get("DARWIN_LLM_CACHE") == "1"
     t0 = time.perf_counter()
     total_in = total_out = 0
@@ -232,7 +238,8 @@ def call_model(role: str, system: str, user: str, schema: Optional[dict] = None,
             if budget is not None:
                 budget.check()
             SpendLedger.check()
-            text, t_in, t_out = _complete(provider, role, system, prompt, schema, model, max_tokens, effort, timeout_s)
+            text, t_in, t_out = _complete(provider, role, system, prompt, schema, model, max_tokens, effort, timeout_s,
+                                          think)
             cost = cost_usd(model, t_in, t_out)
             if budget is not None:
                 budget.charge(cost)

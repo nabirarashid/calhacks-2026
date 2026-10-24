@@ -58,7 +58,7 @@ def test_full_run_events_valid_and_ordered():
     assert len(ctl.history.designs) == budget
     for m in ("cmaes", "random"):
         assert len(ctl.baseline_results[m]) == budget
-        assert summary["curves"][m][-1]["evals"] == budget
+        assert summary["curves"][m][-1]["evals"] == len(ctl.history.designs)   # matched budget
     assert summary["champion"]["score"]["aggregate"] == max(d.score.aggregate for d in ctl.history.designs)
     assert len({d.param_hash for d in ctl.history.designs}) == budget          # no duplicates evaluated
 
@@ -82,6 +82,17 @@ def test_llm_cap_falls_back_to_ga():
     summary = ctl.ch.events[-1]["payload"]["summary"]
     assert any(x.startswith("llm_fallback@") for x in summary["degradations"])
     assert any(e["type"] == "error" and e["payload"]["degraded_to"] == "fallback_proposer" for e in ctl.ch.events)
+
+
+def test_baselines_matched_when_agent_stops_early():
+    ctl = _run({"early_stop_patience": 1, "min_improvement": 10.0})     # every generation "stagnates"
+    used = len(ctl.history.designs)
+    assert used < ctl.config.budget()
+    summary = ctl.ch.events[-1]["payload"]["summary"]
+    for m in ("cmaes", "random"):
+        assert summary["curves"][m][-1]["evals"] == used
+        best = max(ctl.baseline_results[m][:used], key=lambda d: d.score.aggregate)
+        assert summary["baseline_best"][m]["design_id"] == best.design_id
 
 
 def test_geometry_build_cap():
