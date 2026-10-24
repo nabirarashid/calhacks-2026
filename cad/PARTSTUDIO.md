@@ -9,10 +9,15 @@ The geometry spec is PLAN.md B.5. This is the click path.
 
 ## 0. Setup (2 min)
 
-1. Sign in to <https://cad.onshape.com> with the **dev account** whose keys are
-   in `~/.darwin_secrets.sh` (currently Hannah's: `hzw@andrew.cmu.edu`).
-2. **Create** > **Document**, name it `darwin-fin`.
-3. It opens with one Part Studio tab. Rename it `fin` (double-click the tab).
+**The document already exists — do not create a new one.** It is named
+`darwin-fin` and is shared with the account whose API keys the code uses, so a
+second document would not be readable.
+
+1. Get the URL from whoever owns S1 (it lives in `~/.darwin_secrets.sh` as
+   `DARWIN_FIN_DOC_URL`; it is deliberately not committed, per PLAN.md F.5).
+2. Ask them to share the document with your Onshape account email, **can edit**.
+3. Open it. It has one empty Part Studio tab. Rename it `fin` if it isn't
+   already (double-click the tab).
 
 ## 1. Configuration inputs FIRST (10 min)
 
