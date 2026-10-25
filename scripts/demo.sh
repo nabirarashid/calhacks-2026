@@ -3,7 +3,9 @@
 # Reads keys and the wing document from ~/.darwin_secrets.sh; nothing secret lives in the repo.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+set +eu                                            # the secrets file isn't written for strict mode
 source ~/.darwin_secrets.sh
+set -eu
 PY="${PY:-$HOME/.venvs/darwin/bin/python}"
 : "${DARWIN_DOC_WING:?add DARWIN_DOC_WING (the wing Part Studio URL) to ~/.darwin_secrets.sh}"
 : "${OPENROUTER_API_KEY:?add OPENROUTER_API_KEY to ~/.darwin_secrets.sh}"
