@@ -386,7 +386,7 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 
 ## Part C: The four sections
 
-**Progress (Sat 16:30):** done: A1, A3, B1–B5, C1–C4, D1, D2. In progress: A2 (wing Part Studio, W-A's build guide is in `cad/WING_PARTSTUDIO.md`). The Anthropic API works again (16:28, Hannah's own $5). The investigator runs end to end on the
+**Progress (Sat 16:55):** done: A1, A3, B1–B5, C1–C5, D1, D2. In progress: A2 (wing Part Studio, W-A's build guide is in `cad/WING_PARTSTUDIO.md`). The Anthropic API works again (16:28, Hannah's own $5). The investigator runs end to end on the
 real rear-wing solver (CP-C's terminal criterion is met). **Not yet visible in git:** anything from
 W-A (A2 wing Part Studio) or W-D (D1 extension). W-C did A3 (`cad/variables.py`).
 
@@ -511,7 +511,7 @@ The structural/FEA work is parked: leave the files, stop work.
   fixed. Assumptions are listed for the user.
 - [x] **C4 (by 21:30) Session API** ✅ *done 16:20 (W-C): live on the disposable copy with real Onshape writes (3 accepted steps written, before/after versions, Onshape == champion, 21 calls). Pending: the smart planner needs a working LLM (B.9 blocker); the visible morph needs the wing Part Studio (A2)* (B.6), with `cad.variables` on each accepted step, the
   before/after versions, and evidence/report for sessions.
-- [ ] **C5 (by 01:00) Proof bench** on the wing, same simulation budget (20), 3 seeds per goal:
+- [x] **C5 (by 01:00) Proof bench** ✅ *done 16:55 (W-C), `demo/bench_wing.json`: Darwin beats CMA-ES in 8/9 runs, random 9/9, and its no-knowledge ablation 6/9; principles matter on the harder goals (span locked: 118.0 vs 112.9 N median; min drag: 9.90 vs 10.64 N), tie on the easy one; prediction accuracy higher with principles on 2 of 3 goals. Cost $3.77 (estimate was $1.60)* on the wing, same simulation budget (20), 3 seeds per goal:
   - Darwin, CMA-ES, random, Darwin with `DARWIN_KNOWLEDGE=off`
   - **Lead the ablation with prediction accuracy**, then sims-to-target and the final result. W-B's pilot
     (Sat 16:00): accuracy 0.93 with principles vs 0.77 without, but final downforce tied (133.7 vs
