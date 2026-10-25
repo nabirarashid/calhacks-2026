@@ -35,8 +35,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     let detail = `${response.status} ${response.statusText}`;
     try {
-      const body = (await response.json()) as { detail?: string };
-      if (body.detail) detail = body.detail;
+      // A refused prompt (422) carries {message, unsupported, measurable}; other errors carry a string.
+      const body = (await response.json()) as { detail?: string | { message?: string } };
+      if (typeof body.detail === 'string') detail = body.detail;
+      else if (body.detail?.message) detail = body.detail.message;
     } catch {
       // Keep the HTTP status when the response is not JSON.
     }

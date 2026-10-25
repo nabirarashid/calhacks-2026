@@ -369,8 +369,13 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 > nothing else changes. The C5 bench (`demo/bench_wing.json`) and the recordings in `demo/` were made
 > with Claude (Sonnet 5.5 / Haiku 5.5) and say so; they are not re-run on DeepSeek.
 
-- **Provider:** set `DEEPSEEK_API_KEY` in `~/.darwin_secrets.sh` and DeepSeek is used automatically
-  (`backend/llm.py`; explicit `DARWIN_LLM_PROVIDER` wins).
+- **Provider (Sat 18:55): OpenRouter**, so the team can switch models any time. Set
+  `OPENROUTER_API_KEY` in `~/.darwin_secrets.sh` and it is used automatically (it wins over DeepSeek
+  and Anthropic keys; explicit `DARWIN_LLM_PROVIDER` wins over all). Defaults: deep
+  `anthropic/claude-sonnet-5.5`, fast `anthropic/claude-haiku-5.5` (the C5 setup, ~$0.21/session).
+  Any id from openrouter.ai/models works: `DARWIN_MODEL_DEEP=google/gemini-3.8-flash`, etc.
+  OpenRouter reports each call's real cost; the ledger is `.darwin/spend_openrouter.json`.
+  DeepSeek direct (below) stays supported but was too slow for the demo.
 - **Models:** plan and analyze use the deep model **`deepseek-v4-pro`**; prompt parsing uses the fast
   model **`deepseek-flash`**. `DARWIN_MODEL_DEEP=deepseek-flash` makes a session cheaper still.
   On Claude the same roles are Sonnet 5.5 and Haiku 5.5.
@@ -400,7 +405,14 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 
 ## Part C: The four sections
 
-**Progress (Sat 16:55):** done: A1, A3, B1–B5, C1–C5, D1, D2. In progress: A2 (wing Part Studio, W-A's build guide is in `cad/WING_PARTSTUDIO.md`). The Anthropic API works again (16:28, Hannah's own $5). The investigator runs end to end on the
+**Progress (Sat 18:55):** done: A1, A3, A4 (on the disposable copy), B1–B5, C1–C5, D1–D3. **The LLM now goes
+through OpenRouter** (any model, chosen by env; B.9). **The fin demo works end to end on the trapezoid
+copy:** prompt in the panel → DeepSeek/Claude plans with fin principles → every accepted step morphs
+all five fin dimensions live in Onshape → versions before/after (live 18:34: drag −12% in 46 s;
+18:43: mass −28% in 52 s). Waiting on: the wing Part Studio URL from W-A (A2, reported done) to
+run A5/A6 on the wing; C6 recordings; D4–D6.
+
+*Earlier (Sat 16:55):* done: A1, A3, B1–B5, C1–C5, D1, D2. In progress: A2 (wing Part Studio, W-A's build guide is in `cad/WING_PARTSTUDIO.md`). The Anthropic API works again (16:28, Hannah's own $5). The investigator runs end to end on the
 real rear-wing solver (CP-C's terminal criterion is met). **Not yet visible in git:** anything from
 W-A (A2 wing Part Studio) or W-D (D1 extension). W-C did A3 (`cad/variables.py`).
 
@@ -417,7 +429,8 @@ W-A (A2 wing Part Studio) or W-D (D1 extension). W-C did A3 (`cad/variables.py`)
 
 **Checklist:**
 - [x] **A1 Morph spike** — done 14:49 (W-C): feature updates morph live; configuration updates don't.
-- [ ] **A2 (by 18:00) Rear-wing Part Studio**, built on a dev account:
+- [ ] **A2 (by 18:00) Rear-wing Part Studio**, built on a dev account: *(W-A reports done, Sat 18:50;
+  W-C verifies with `ensure_variables` + a live morph as soon as the document URL arrives)*
   - one **Variable feature per B.5 param** at the top of the feature list, named exactly as in B.5
   - **dimensions per B.5 "Geometry definition"** — `#chord_mm` is the *total* chord (W-B, 16:15)
   - main element: airfoil profile from imported points or a spline, inverted, chord
@@ -434,8 +447,11 @@ W-A (A2 wing Part Studio) or W-D (D1 extension). W-C did A3 (`cad/variables.py`)
   - `list_variables`, `apply_values`, `create_version`
   - mocked tests from a sanitized feature-list fixture
   - then live on the wing: write → re-GET → value matches → default STL bbox changes
-- [ ] **A4 (by 20:30)** Variable features on the fin Part Studio (same names as the fin params)
-  so the fin beat morphs too. If that's hard, the fin beat runs from replay.
+- [x] **A4 (by 20:30)** Variable features on the fin Part Studio (same names as the fin params)
+  so the fin beat morphs too. If that's hard, the fin beat runs from replay. ✅ *done 18:32 (W-C) on the
+  disposable trapezoid copy: five Variables (`root_chord`, `taper_ratio`, `semi_span`, `sweep_deg`,
+  `thickness`) drive the sketch and extrude; live morph verified by bounding box (90×60 → 125×80 mm in
+  0.8 s); full fin sessions from the panel API morph it step by step. Prod fin doc still to do (A6).*
 - [ ] **A5 (by 21:30, with W-C)** Full session on the wing: each accepted step morphs the open
   tab; "before"/"after" versions exist; zero failed writes.
 - [ ] **A6 (by 01:00)** Prod copies of the wing and fin documents; set `DARWIN_DOC_WING`,
@@ -573,8 +589,10 @@ The structural/FEA work is parked: leave the files, stop work.
   4. notebook drawer (beliefs, lever effects, ruled out)
   5. final summary with before/after
   6. stop button
-- [ ] **D3 (by 21:30)** Live against the backend during a real session, next to the morphing
-  Onshape tab.
+- [x] **D3 (by 21:30)** Live against the backend during a real session, next to the morphing
+  Onshape tab. ✅ *done Sat 17:20–18:45: sessions started from the panel against the live backend,
+  writes landing in the open Onshape tab. W-C fixed refusals showing "[object Object]" (18:53).
+  Note: without `?doc=` the panel falls back to a recording; open it with the document link.*
 - [ ] **D4 (by 23:30) Pitch and Devpost** from Part F and `docs/DIRECTION.md`. Slides: problem,
   the loop, live demo, proof bench, path to production (Onshape App Store app, CFD adapter).
 - [ ] **D5 (by 01:00)** Hide the old population panels from the main path; keep them on a

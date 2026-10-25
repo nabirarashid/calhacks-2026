@@ -6,7 +6,8 @@ import pytest
 from backend import llm
 
 LLM_ENV = ("DARWIN_LLM_PROVIDER", "DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY", "DARWIN_MODEL_FAST", "DARWIN_MODEL_DEEP",
-           "DEEPSEEK_BASE_URL", "DARWIN_LLM_CACHE", "DARWIN_FAST_THINKING", "DARWIN_DEEPSEEK_THINKING")
+           "DEEPSEEK_BASE_URL", "DARWIN_LLM_CACHE", "DARWIN_FAST_THINKING", "DARWIN_DEEPSEEK_THINKING",
+           "OPENROUTER_API_KEY", "OPENROUTER_BASE_URL")
 
 
 @pytest.fixture(autouse=True)
@@ -124,3 +125,47 @@ def test_prompt_never_contains_the_key(deepseek):
     replies.append(ok('{"a": 1}'))
     llm.call_model("plan", "s", "u", {"type": "object"})
     assert "test-key" not in json.dumps(sent[0]["body"])
+
+
+@pytest.fixture
+def openrouter(monkeypatch):
+    import httpx
+    monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")
+    sent, replies = [], []
+    monkeypatch.setattr(httpx, "post", lambda url, json=None, timeout=None, headers=None:
+                        sent.append({"url": url, "body": json, "headers": headers}) or replies.pop(0))
+    return sent, replies
+
+
+def test_openrouter_wins_and_any_model_id_works(monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "y")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "z")
+    assert (llm.provider_name(), llm.fast_model(), llm.deep_model()) == \
+        ("openrouter", "anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5")
+    monkeypatch.setenv("DARWIN_MODEL_DEEP", "google/gemini-3.8-flash")    # pick any model, any time
+    monkeypatch.setenv("DARWIN_MODEL_FAST", "deepseek-flash")             # another provider's name: ignored
+    assert (llm.fast_model(), llm.deep_model()) == ("anthropic/claude-haiku-5.5", "google/gemini-3.8-flash")
+
+
+def test_openrouter_request_and_reported_cost(openrouter):
+    sent, replies = openrouter
+    r1 = ok('{"a": 1}')
+    r1._data["usage"]["cost"] = 0.0123
+    replies.extend([r1, ok('{"b": 2}')])
+    r = llm.call_model("plan", "s", "u", {"type": "object"}, model=llm.deep_model(), effort="medium")
+    assert r.data == {"a": 1} and r.provider == "openrouter" and r.cost_usd == pytest.approx(0.0123)
+    body = sent[0]["body"]
+    assert sent[0]["url"] == "https://openrouter.ai/api/v1/chat/completions"
+    assert sent[0]["headers"]["Authorization"] == "Bearer or-key" and body["model"] == "anthropic/claude-sonnet-5.5"
+    assert body["reasoning"] == {"effort": "medium", "exclude": True} and body["usage"] == {"include": True}
+    assert body["response_format"] == {"type": "json_object"} and "reasoning_effort" not in body
+    llm.call_model("parse", "s", "u", {"type": "object"}, think=False)
+    assert sent[1]["body"]["reasoning"] == {"enabled": False} and sent[1]["body"]["model"] == "anthropic/claude-haiku-5.5"
+    assert llm.SpendLedger.path().name == "spend_openrouter.json"
+
+
+def test_openrouter_upstream_error_in_a_200_is_unavailable(openrouter):
+    sent, replies = openrouter
+    replies.extend([Resp(200, {"error": {"message": "Provider returned error"}})] * 3)
+    with pytest.raises(llm.LLMUnavailable, match="Provider returned error"):
+        llm.call_model("plan", "s", "u", {"type": "object"})
