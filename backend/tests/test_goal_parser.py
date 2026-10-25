@@ -1,3 +1,4 @@
+import pytest
 import json
 from pathlib import Path
 
@@ -124,3 +125,33 @@ def test_no_llm_fallback_for_the_wing_reads_numbers_and_editable(monkeypatch):
     g2, _ = parse_goal("Cut drag but keep at least 130 N of downforce.", space, w.catalog(space.scorer), w.presets)
     assert [o.metric for o in g2.objectives] == ["drag_n"]
     assert ("downforce_n", ">=", 130.0) in [(c.ref, c.op, c.value) for c in g2.constraints]
+
+
+STRUCTURAL = ("Make this wing at least 25% lighter. Keep all mounting interfaces unchanged, maintain a factor of "
+              "safety above 2, keep maximum deflection below 0.2 mm under a 150 N load, and ensure it can be "
+              "manufactured on a 3-axis mill")
+
+
+def test_llm_flagged_unsupported_requests_fail_closed():
+    from backend.agents.goal_parser import UnsupportedGoal
+    space = _wing()
+    from backend.wiring import Wiring
+    cat = Wiring().catalog(space.scorer)
+    data = {"objectives": [{"metric": "downforce_n", "direction": "maximize", "weight": 1}], "constraints": [],
+            "fixed_params": [], "editable": [], "assumptions": [],
+            "unsupported": ["25% lighter (no mass metric)", "factor of safety above 2", "deflection below 0.2 mm"]}
+    with pytest.raises(UnsupportedGoal) as e:
+        to_goal(data, STRUCTURAL, space, cat)
+    assert "factor of safety" in str(e.value) and "downforce" in str(e.value)
+
+
+def test_no_llm_fallback_refuses_requests_about_other_physics(monkeypatch):
+    monkeypatch.setenv("DARWIN_LLM_PROVIDER", "replay")
+    from backend.agents.goal_parser import UnsupportedGoal, parse_goal
+    from backend.wiring import Wiring
+    w = Wiring()
+    space = w.resolve("rear_wing")
+    with pytest.raises(UnsupportedGoal):
+        parse_goal(STRUCTURAL, space, w.catalog(space.scorer), w.presets)
+    g, _ = parse_goal("More downforce under 14 N of drag.", space, w.catalog(space.scorer), w.presets)
+    assert g.parsed_by == "fallback"                                    # aero requests still work without the LLM

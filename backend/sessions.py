@@ -99,6 +99,8 @@ def make_router(W: Any, BUS: Any, RUNS: Dict[str, Any], is_busy: Callable[[], bo
                                 % (m.project_id, m.authority.maturity))
         try:
             goal, _ = goal_parser.parse_goal(prompt, space, W.catalog(space.scorer), W.presets)
+        except goal_parser.UnsupportedGoal as e:
+            raise HTTPException(422, {"message": str(e), "unsupported": e.unsupported, "measurable": e.measurable})
         except llm.LLMUnavailable as e:
             raise HTTPException(503, str(e))
         except ValueError as e:

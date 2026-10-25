@@ -193,6 +193,8 @@ def parse_goal(req: ParseGoalRequest) -> Dict[str, Any]:
     space = _space(req.project_id or req.design_space_id)
     try:
         goal, _ = goal_parser.parse_goal(text, space, W.catalog(space.scorer), W.presets)
+    except goal_parser.UnsupportedGoal as e:
+        raise HTTPException(422, {"message": str(e), "unsupported": e.unsupported, "measurable": e.measurable})
     except llm.LLMUnavailable as e:
         raise HTTPException(503, str(e))
     return goal.model_dump(mode="json")

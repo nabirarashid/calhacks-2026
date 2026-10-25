@@ -9,6 +9,19 @@ from backend.agents.base import _packs, compact_specs, system_prompt, unverified
 from backend.agents.schemas import goal_schema
 
 
+class UnsupportedGoal(ValueError):
+    """The request asks for things this project's solver can't measure. Fail closed: never substitute a goal."""
+
+    def __init__(self, unsupported: List[str], measurable: List[str]) -> None:
+        self.unsupported, self.measurable = unsupported, measurable
+        ValueError.__init__(self, "This project can't evaluate: %s. It can measure: %s."
+                            % ("; ".join(unsupported), ", ".join(measurable)))
+
+
+def measurable(catalog: List[MetricInfo]) -> List[str]:
+    return ["%s (%s)" % (m.description.lower(), m.name) for m in catalog if m.better != "info"]
+
+
 def _cast(space: DesignSpace, name: str, value: str) -> Any:
     p = space.param(name)
     if p.kind == "integer":
@@ -130,6 +143,9 @@ def to_goal(data: Dict[str, Any], text: str, space: DesignSpace, catalog: List[M
     rules = getattr(_packs.get(space.id), "goal_rules", None)
     if rules is not None:      # deterministic domain rules (e.g. rocket_fin's body-tube reading)
         constraints = rules(text, space, constraints, overrides, assumptions)
+    unsupported = [str(u).strip() for u in data.get("unsupported") or [] if str(u).strip()]
+    if unsupported:
+        raise UnsupportedGoal(unsupported[:6], measurable(catalog))
     llm_editable = [n for n in data.get("editable") or [] if n in params]
     editable, note = resolve_editable(text, space, llm_editable, fixed)
     assumptions = [note] + assumptions[:5]
@@ -178,8 +194,18 @@ def fallback_goal(text: str, presets: List[Preset], reason: str,
     return g
 
 
+def _validate(d: Dict[str, Any], text: str, space: DesignSpace, catalog: List[MetricInfo],
+              verdict: Dict[str, Any]) -> None:
+    """call_model retries on errors; an unsupported request is a valid answer, so record it and accept."""
+    try:
+        to_goal(d, text, space, catalog)
+    except UnsupportedGoal as e:
+        verdict["unsupported"] = e
+
+
 def parse_goal(text: str, space: DesignSpace, catalog: List[MetricInfo], presets: List[Preset],
                budget: Optional[llm.RunLLMBudget] = None) -> Tuple[Goal, Optional[ModelResult]]:
+    verdict = {}  # type: Dict[str, Any]
     keys = getattr(_packs.get(space.id), "goal_context_keys", None)     # None = the whole context
     block = {"text": text,
              "metrics": [{"name": m.name, "unit": m.unit, "better": m.better, "description": m.description}
@@ -191,11 +217,20 @@ def parse_goal(text: str, space: DesignSpace, catalog: List[MetricInfo], presets
         res = llm.call_model("goal_parser", system_prompt("goal_parser", space),
                              user_message("Parse this goal.", block), goal_schema(space, catalog),
                              max_tokens=2000, effort="low", budget=budget, think=False,
-                             validate=lambda d: to_goal(d, text, space, catalog))
+                             validate=lambda d: _validate(d, text, space, catalog, verdict))
     except (llm.LLMUnavailable, llm.BudgetExceeded) as e:
+        # Without the model, only accept requests that name something this project measures; a preset
+        # chosen by word overlap must never stand in for a request about something else.
+        words = {w for m in catalog if m.better != "info"
+                 for w in re.findall(r"[a-z]+", (m.name.replace("_", " ") + " " + m.description).lower()) if len(w) > 3}
+        if not words & set(re.findall(r"[a-z]+", text.lower())):
+            raise UnsupportedGoal(["the request (couldn't map it to this project's metrics without the language "
+                                   "model)"], measurable(catalog))
         presets = list(presets) + list(getattr(_packs.get(space.id), "presets", []))
         g = fallback_goal(text, presets, str(e), catalog)
         g.editable, note = resolve_editable(text, space, None, g.fixed_params)   # same C3 rules as the LLM path
         g.assumptions = [note] + g.assumptions
         return g, None
+    if "unsupported" in verdict:
+        raise verdict["unsupported"]
     return to_goal(res.data, text, space, catalog), res
