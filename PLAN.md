@@ -502,8 +502,11 @@ W-A (A2 wing Part Studio) or W-D (D1 extension). W-C did A3 (`cad/variables.py`)
   - [ ] in `~/.darwin_secrets.sh` on the demo laptop: `DARWIN_DOC_WING` (wing URL), `OPENROUTER_API_KEY`,
     and `ONSHAPE_CALLS_REMAINING` raised with a fresh `_AT` time (the local counter would otherwise
     stop writes at its 400 reserve although Onshape's real limits are per endpoint)
-  - [ ] if the demo laptop isn't Hannah's: copy `.darwin/feature_ids/` from hers (never re-run
-    `adopt_variables`, it would add a second set of `Darwin:` features)
+  - [x] any laptop can run the demo: the wing's feature ids are committed
+    (`projects/rear_wing/onshape_feature_ids.json`, no document id). Never re-run `adopt_variables`;
+    it would add a second set of `Darwin:` features (W-C, Sun 00:30)
+  - [x] `outputs/`: every recording, the Onshape call ledger, LLM spend, landscapes and geometry,
+    refreshed with `make outputs` (refuses on document ids or keys)
   - [ ] backup Onshape API keys from a teammate's account, wing shared to it with edit access
 
 **Standalone acceptance (zero network):** `pytest cad/tests` covers: variable lookup by name;
