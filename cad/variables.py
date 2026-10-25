@@ -259,7 +259,12 @@ def apply_values(doc_url: str, params: Mapping[str, ParamValue], units: Mapping[
             wrong = [n for n, _, e in changes if after.get(n, {}).get("expression") != e]
             if wrong:
                 return _fail(key, "read-back mismatch for %s" % ", ".join(wrong), calls(), started)
-        text = c.export_stl(did, wid, eid, purpose="apply_verify")
+        try:
+            text = c.export_stl(did, wid, eid, purpose="apply_verify")
+        except OnshapeError as e:            # the variables are written and verified; the STL is only evidence
+            return GeometryRef(geometry_key=key, status="ready", source="onshape_feature",
+                               error="stl_export: %s" % str(e)[:200], onshape_calls=calls(), regen_status="OK",
+                               elapsed_ms=(time.time() - started) * 1000.0)
         m = stl.measure(None, text)
         ref = GeometryRef(geometry_key=key, status="ready", source="onshape_feature", stl_url="/api/geometry/%s.stl" % key,
                           bbox_mm=m["bbox_mm"], volume_mm3=m["volume_mm3"], triangles=m["triangles"],
