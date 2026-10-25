@@ -213,6 +213,10 @@ def _deepseek(system: str, user: str, schema: Optional[dict], model: str, max_to
     key = os.environ.get("DEEPSEEK_API_KEY")
     if not key:
         raise LLMUnavailable("DEEPSEEK_API_KEY is not set")
+    # Thinking is off unless DARWIN_DEEPSEEK_THINKING=1. Measured Sat 18:00 on the same goal: V4 Pro with
+    # thinking took 31-49 s per plan (timeouts at 40 s, ~6 min per session); without it, 2-5 s, 54 s per
+    # session, and a comparable result (130 vs 133 N, n = 1 each).
+    think = think and os.environ.get("DARWIN_DEEPSEEK_THINKING") == "1"
     if schema is not None:   # JSON mode needs the word "json" and the expected shape in the prompt
         system = "%s\n\nReply with ONLY one json object that matches this JSON schema:\n%s" % (
             system, json.dumps(schema, separators=(",", ":")))

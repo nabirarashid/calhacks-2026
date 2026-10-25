@@ -143,6 +143,9 @@ def test_llm_flagged_unsupported_requests_fail_closed():
     with pytest.raises(UnsupportedGoal) as e:
         to_goal(data, STRUCTURAL, space, cat)
     assert "factor of safety" in str(e.value) and "downforce" in str(e.value)
+    data["objectives"] = []          # DeepSeek's shape (live, Sat 17:55): no objective at all, just the refusal
+    with pytest.raises(UnsupportedGoal, match="no mass metric"):
+        to_goal(data, STRUCTURAL, space, cat)
 
 
 def test_no_llm_fallback_refuses_requests_about_other_physics(monkeypatch):

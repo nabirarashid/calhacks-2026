@@ -374,8 +374,11 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 - **Models:** plan and analyze use the deep model **`deepseek-v4-pro`**; prompt parsing uses the fast
   model **`deepseek-flash`**. `DARWIN_MODEL_DEEP=deepseek-flash` makes a session cheaper still.
   On Claude the same roles are Sonnet 5.5 and Haiku 5.5.
-  - Expected cost: well under $0.10 per session on DeepSeek (measure one run before batches;
-    the ledger prices at peak rates, off-peak is half).
+  - **DeepSeek thinking is off by default** (`DARWIN_DEEPSEEK_THINKING=1` turns it on). Measured live
+    Sat 18:00, same goal (max downforce, drag ≤ 15 N), n = 1 each: thinking off → 2–5 s per call,
+    54 s per 8-step session, 130.3 N, $0.07; V4 Pro thinking → 31–49 s per plan, timeouts, ~6 min,
+    132.6 N, $0.18; flash thinking → 3 min, 136.1 N, $0.06. (Sonnet in C5: 133.1 N; CMA-ES 125.1 N.)
+  - Prompt parsing: 7 test prompts, all parsed correctly in one call (~1 s), refusals included.
   - Caps: $0.60 per session, `DARWIN_SPEND_CAP_TOTAL_USD` total, **one local ledger per provider**
     (`.darwin/spend_deepseek.json`; the old Claude spend stays in `.darwin/spend.json`).
   - Rehearse in replay.
@@ -671,9 +674,8 @@ The numbers above are illustrative. **Say only the numbers from the actual run.*
   - measurable usefulness: sims-to-target vs CMA-ES, the ablation
   - path to production: Onshape App Store app, CFD adapter
   - responsible design: numbers only from solvers, versioned writes, code decides acceptance
-- **Anthropic:** named community: collegiate aero teams, starting with CMU Rocket Command (our
-  lived problem, in our own words; never invent quotes). Claude is the reasoning, and we show
-  where it fails and how predictions catch it.
+- **Anthropic:** dropped (Sat Oct 24 evening). The live product runs on DeepSeek, so "thoughtful
+  use of Claude" no longer holds.
 - **Factory Droid:** stretch only, after 01:00, if Droid does real work in the running loop.
 - **SpacetimeDB:** dropped.
 

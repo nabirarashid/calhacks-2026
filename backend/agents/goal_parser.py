@@ -109,6 +109,9 @@ def to_goal(data: Dict[str, Any], text: str, space: DesignSpace, catalog: List[M
         objectives.append(Objective(metric=o["metric"], direction=o["direction"], target=target, tolerance=tol,
                                     weight=max(0.0, float(o.get("weight", 1.0)))))
     if not objectives:
+        unsupported = [str(u).strip() for u in data.get("unsupported") or [] if str(u).strip()]
+        if unsupported:        # a refusal with no objective is a complete answer (DeepSeek gives it that way)
+            raise UnsupportedGoal(unsupported[:6], measurable(catalog))
         raise ValueError("at least one objective is required")
     total = sum(o.weight for o in objectives) or 1.0
     for o in objectives:

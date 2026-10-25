@@ -2,7 +2,7 @@
 
 Reference for choosing which tracks Darwin goes after, so the work gets built into the plan and isn't bolted on at the end. The **fit assessment** is ours. **Track details** is the organizers' text as posted (lightly formatted; it may change, so check the Live Site and Hacker Starter Packs).
 
-Status: **decided Sat Oct 24 ~11:15.** In: Overall/Technical, Microsoft (primary), Anthropic, Factory Droid. Conditional: SpacetimeDB (go/no-go at CP7, 18:00). Out: Hyphenate (treated as finance-only), Cartesia, Meta, SpaceXAI, everything else. The work items and owners are in PLAN.md Part H. The assessment below is what the decision was based on.
+Status: **decided Sat Oct 24 ~11:15.** In: Overall/Technical, Microsoft (primary), Factory Droid. **Update Sat evening: Anthropic dropped** (the product now runs on DeepSeek). Conditional: SpacetimeDB (go/no-go at CP7, 18:00). Out: Hyphenate (treated as finance-only), Cartesia, Meta, SpaceXAI, everything else. The work items and owners are in PLAN.md Part H. The assessment below is what the decision was based on.
 
 ## Fit assessment (Darwin as of weekend plan v3)
 
@@ -80,10 +80,8 @@ More details: "CalHacks_Hyphenate_Track" (linked doc).
 
 **Prize:** $5,000 in Claude credits + 1 year of Claude Max 20x + Office Hours.
 
-> **At risk (Sat Oct 24 evening):** the running product now defaults to DeepSeek, so criterion 4
-> ("thoughtful use of Claude") no longer holds for the live demo. Claude is still a supported
-> provider (`DARWIN_LLM_PROVIDER=anthropic`), and the C5 bench and the recordings were made with
-> Claude. Decide as a team whether to keep this track (demo on Claude) or drop it.
+> **Dropped (Sat Oct 24 evening, team decision):** the running product now uses DeepSeek, so
+> criterion 4 ("thoughtful use of Claude") no longer holds.
 
 #### Best Use of Factory Droid SDK (Factory)
 **Eligibility:** The project must use the Droid SDK (TypeScript or Python) in a meaningful way. Droid should do real work in the running product, not just help you write code. The repo README should explain where and how Droid is used.

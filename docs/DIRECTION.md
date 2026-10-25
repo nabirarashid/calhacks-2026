@@ -280,7 +280,7 @@ Fallback: a recorded run, replayed in the same panel, plus a video.
 |---|---|---|
 | Overall / Most Technically Complex | In | A reasoning loop + live CAD + solver + measured ablation |
 | **Microsoft: Built for the Real World** | **In, primary** | Production-minded agent: customer (aero teams), measurable usefulness (sims-to-target), path to production (Onshape App Store, CFD adapter), responsible design (versioned writes, numbers from the solver) |
-| **Anthropic** | **In** | Named community: collegiate aero teams, starting with CMU Rocket Command (lived problem). Claude *is* the reasoning; we show where it fails and how predictions catch it |
+| **Anthropic** | **Out** (Sat evening: the product now runs on DeepSeek) | Was: named community: collegiate aero teams, starting with CMU Rocket Command (lived problem). Claude *is* the reasoning; we show where it fails and how predictions catch it |
 | Factory Droid | **Drop** | Its use case was drafting adapters for many domains, which we no longer do |
 | SpacetimeDB | **Drop** | Not core |
 | Cartesia, Meta, SpaceXAI, Hyphenate | Out | Unchanged |

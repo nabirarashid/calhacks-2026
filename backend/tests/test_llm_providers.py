@@ -6,7 +6,7 @@ import pytest
 from backend import llm
 
 LLM_ENV = ("DARWIN_LLM_PROVIDER", "DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY", "DARWIN_MODEL_FAST", "DARWIN_MODEL_DEEP",
-           "DEEPSEEK_BASE_URL", "DARWIN_LLM_CACHE", "DARWIN_FAST_THINKING")
+           "DEEPSEEK_BASE_URL", "DARWIN_LLM_CACHE", "DARWIN_FAST_THINKING", "DARWIN_DEEPSEEK_THINKING")
 
 
 @pytest.fixture(autouse=True)
@@ -69,10 +69,20 @@ def test_deepseek_json_call(deepseek):
     assert sent[0]["url"] == "https://api.deepseek.com/chat/completions"
     assert sent[0]["headers"]["Authorization"] == "Bearer test-key"
     assert body["response_format"] == {"type": "json_object"} and "json" in body["messages"][0]["content"]
-    assert body["reasoning_effort"] == "low" and "temperature" not in body
+    assert body["reasoning_effort"] == "none" and "temperature" not in body     # thinking off by default (speed)
     assert r.cost_usd == pytest.approx(1000 * 1.32e-6 + 200 * 3.96e-6)
     assert llm.SpendLedger.path().name == "spend_deepseek.json"
     assert llm.SpendLedger.read()["calls"] == 1
+
+
+def test_deepseek_thinking_opt_in(deepseek, monkeypatch):
+    sent, replies = deepseek
+    monkeypatch.setenv("DARWIN_DEEPSEEK_THINKING", "1")
+    replies.extend([ok('{"a": 1}'), ok('{"a": 1}')])
+    llm.call_model("plan", "s", "u", {"type": "object"}, effort="medium")
+    llm.call_model("parse", "s", "u", {"type": "object"}, think=False)
+    assert [s["body"]["reasoning_effort"] for s in sent] == ["low", "none"]
+    assert sent[0]["body"]["max_tokens"] > sent[1]["body"]["max_tokens"]          # headroom for the reasoning
 
 
 def test_deepseek_fast_call_disables_thinking_and_retries_bad_json(deepseek):
