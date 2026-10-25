@@ -51,6 +51,12 @@ def make_router(W: Any, BUS: Any, RUNS: Dict[str, Any], is_busy: Callable[[], bo
     router = APIRouter()
 
     def project_for(doc_url: str) -> Tuple[ProjectManifest, DesignSpace]:
+        # Offline (replay or no CAD), the panel's default "mock://rear-wing" names the project directly,
+        # so a replayed session shows the wing's parameters instead of an error (C6).
+        if (doc_url or "").startswith("mock://") and W.modes.get("cad") != "real":
+            pid = doc_url[len("mock://"):].replace("-", "_")
+            if pid in W.projects.ids():
+                return W.projects.get(pid), W.resolve(pid)
         did = doc_id(doc_url)
         if did:
             for pid in W.projects.ids():

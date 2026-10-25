@@ -1,0 +1,130 @@
+{
+ "sims_budget": 20,
+ "repeats": 3,
+ "generated_at": "2026-10-24T16:46:59",
+ "goals": [
+  {
+   "goal": "downforce_drag15",
+   "label": "Max downforce, drag \u2264 15 N",
+   "metric": "downforce_n",
+   "unit": "N",
+   "best_known": 135.1,
+   "rows": [
+    {
+     "method": "darwin",
+     "label": "Darwin",
+     "median_final": 133.11,
+     "pct_of_best": 98.5,
+     "reached_95pct": 3,
+     "median_sims_to_95pct": 6
+    },
+    {
+     "method": "darwin_noknow",
+     "label": "Darwin, no principles",
+     "median_final": 133.29,
+     "pct_of_best": 98.7,
+     "reached_95pct": 3,
+     "median_sims_to_95pct": 8
+    },
+    {
+     "method": "cmaes",
+     "label": "CMA-ES",
+     "median_final": 125.06,
+     "pct_of_best": 92.6,
+     "reached_95pct": 1,
+     "median_sims_to_95pct": 19
+    },
+    {
+     "method": "random",
+     "label": "Random",
+     "median_final": 106.91,
+     "pct_of_best": 79.1,
+     "reached_95pct": 0,
+     "median_sims_to_95pct": null
+    }
+   ]
+  },
+  {
+   "goal": "downforce_span_fixed",
+   "label": "Same, span locked",
+   "metric": "downforce_n",
+   "unit": "N",
+   "best_known": 118.92,
+   "rows": [
+    {
+     "method": "darwin",
+     "label": "Darwin",
+     "median_final": 118.05,
+     "pct_of_best": 99.3,
+     "reached_95pct": 2,
+     "median_sims_to_95pct": 4.0
+    },
+    {
+     "method": "darwin_noknow",
+     "label": "Darwin, no principles",
+     "median_final": 112.91,
+     "pct_of_best": 94.9,
+     "reached_95pct": 1,
+     "median_sims_to_95pct": 15
+    },
+    {
+     "method": "cmaes",
+     "label": "CMA-ES",
+     "median_final": 107.57,
+     "pct_of_best": 90.5,
+     "reached_95pct": 0,
+     "median_sims_to_95pct": null
+    },
+    {
+     "method": "random",
+     "label": "Random",
+     "median_final": 106.85,
+     "pct_of_best": 89.9,
+     "reached_95pct": 0,
+     "median_sims_to_95pct": null
+    }
+   ]
+  },
+  {
+   "goal": "min_drag_df120",
+   "label": "Min drag, downforce \u2265 120 N",
+   "metric": "drag_n",
+   "unit": "N",
+   "best_known": 9.6,
+   "rows": [
+    {
+     "method": "darwin",
+     "label": "Darwin",
+     "median_final": 9.9,
+     "pct_of_best": 97.0,
+     "reached_95pct": 3,
+     "median_sims_to_95pct": 11
+    },
+    {
+     "method": "darwin_noknow",
+     "label": "Darwin, no principles",
+     "median_final": 10.64,
+     "pct_of_best": 90.2,
+     "reached_95pct": 1,
+     "median_sims_to_95pct": 20
+    },
+    {
+     "method": "cmaes",
+     "label": "CMA-ES",
+     "median_final": 12.88,
+     "pct_of_best": 74.5,
+     "reached_95pct": 0,
+     "median_sims_to_95pct": null
+    },
+    {
+     "method": "random",
+     "label": "Random",
+     "median_final": 13.61,
+     "pct_of_best": 70.5,
+     "reached_95pct": 0,
+     "median_sims_to_95pct": null
+    }
+   ]
+  }
+ ]
+}

@@ -420,7 +420,13 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 
 ## Part C: The four sections
 
-**Progress (Sat 19:30) — THE DEMO IS THE WING** (document "calhacks2", Part Studio `rear_wing`; the
+**Progress (Sun 01:15):** done: A1–A6, B1–B5, C1–C6, D1–D3, D5. Open: A2b chord (W-A), D4 Canva deck
+(team; pitch kit, Devpost and chart ready), D6 fallback video (record once), the extension's first real-Chrome
+run (in progress). Tracks: Microsoft (primary) + Overall; for the third, **Anthropic is viable again**
+(Claude Haiku now does every reasoning step) and needs one real conversation with a named team. Factory
+would need the Droid SDK doing real work in the product, which we don't have. See `docs/pitch_kit.md`.
+
+*Sat 19:30 — the demo is the wing:* (document "calhacks2", Part Studio `rear_wing`; the
 trapezoid/fin is retired). Done: A1, A2 (except chord → A2b), A3, A5, B1–B5, C1–C5, D1–D3.
 - **A5 done live (19:25):** prompt via the panel API → Haiku 5.5 (OpenRouter) plans 7 steps, every one
   citing principles → 5 accepted steps morph the wing in Onshape → versions "Before Darwin" and
@@ -493,21 +499,11 @@ W-A (A2 wing Part Studio) or W-D (D1 extension). W-C did A3 (`cad/variables.py`)
 - [x] **A5 (by 21:30, with W-C)** Full session on the wing: each accepted step morphs the open
   tab; "before"/"after" versions exist; zero failed writes. ✅ *done 19:25 (W-C): 5/5 writes OK,
   versions created, downforce +41%; chord locked until wired*
-- [ ] **A6 (by 01:00)** Demo laptop ready. *Revised Sat 19:50: the wing already lives on the prod
-  account (Hannah's) and the fin is retired, so no copies (a copy would also cut W-A off from the
-  chord fix).* Steps:
-  - [x] one command: `make demo` (`scripts/demo.sh`) starts the live backend and the panel, checks the
-    six adopted `Darwin:` Variables, prints the panel link; `make reset-wing PY=~/.venvs/darwin/bin/python`
-    puts the wing back to baseline (W-C, 19:50)
-  - [ ] in `~/.darwin_secrets.sh` on the demo laptop: `DARWIN_DOC_WING` (wing URL), `OPENROUTER_API_KEY`,
-    and `ONSHAPE_CALLS_REMAINING` raised with a fresh `_AT` time (the local counter would otherwise
-    stop writes at its 400 reserve although Onshape's real limits are per endpoint)
-  - [x] any laptop can run the demo: the wing's feature ids are committed
-    (`projects/rear_wing/onshape_feature_ids.json`, no document id). Never re-run `adopt_variables`;
-    it would add a second set of `Darwin:` features (W-C, Sun 00:30)
-  - [x] `outputs/`: every recording, the Onshape call ledger, LLM spend, landscapes and geometry,
-    refreshed with `make outputs` (refuses on document ids or keys)
-  - [ ] backup Onshape API keys from a teammate's account, wing shared to it with edit access
+- [x] **A6 (by 01:00)** Demo laptop ready. ✅ *done Sun ~01:00: `DARWIN_DOC_WING`, `OPENROUTER_API_KEY` and
+  a re-synced `ONSHAPE_CALLS_REMAINING` in Hannah's secrets; `make demo` runs everything; the wing's feature
+  ids are committed so any laptop works; backup Onshape account ready. (No prod copies: the wing already
+  lives on the prod account and the fin is retired.)* Never re-run `adopt_variables` on the wing; it would
+  add a second set of `Darwin:` features. `make reset-wing PY=~/.venvs/darwin/bin/python` between runs.
 
 **Standalone acceptance (zero network):** `pytest cad/tests` covers: variable lookup by name;
 the expression format per unit; refusal for documents not in the write allowlist; refusal below
@@ -600,8 +596,11 @@ The structural/FEA work is parked: leave the files, stop work.
   - **Goals:** the demo goal, plus at least one where the easy lever is gone (e.g. span fixed), so the
     agent has to work the flap/AoA lift budget the principles cover, and results can separate.
   - Output `demo/bench_wing.json`. Needs a working LLM (see B.9).
-- [ ] **C6 (by 02:00)** Recordings: a wing session and a fin session, both replayable with no
-  keys. The old population loop stays as the baseline engine.
+- [x] **C6 (by 02:00)** Recordings: a wing session and a fin session, both replayable with no
+  keys. The old population loop stays as the baseline engine. ✅ *done Sun 01:05 (W-C): the live Haiku
+  wing session is `demo/recordings/session_1925_d20d.jsonl`; `make replay` plays it in the panel with every
+  key unset (verified: 56 events, ends at 138.7 N); offline, the panel's default document maps to the wing
+  so no error shows. Fin retired, so no fin recording; older fin recordings remain.*
 
 **Standalone acceptance:** `make test` with fakes. This covers:
 - LLM-output validation (bad lever, out of bounds, unknown principle)
@@ -648,9 +647,16 @@ The structural/FEA work is parked: leave the files, stop work.
   Note: without `?doc=` the panel falls back to a recording; open it with the document link.*
 - [ ] **D4 (by 23:30) Pitch and Devpost** from Part F and `docs/DIRECTION.md`. Slides: problem,
   the loop, live demo, proof bench, path to production (Onshape App Store app, CFD adapter).
-- [ ] **D5 (by 01:00)** Hide the old population panels from the main path; keep them on a
-  `/proof` page for the bench.
+  *Sun 01:10 (W-C): `docs/devpost.md` TODOs filled with the measured wing run and bench; `docs/pitch_kit.md`
+  has the run of show, the Canva slide plan, judge Q&A and track strategy; bench chart for the deck in
+  `demo/bench_wing_{light,dark}.png` (`scripts/plot_bench.py`). Remaining: the Canva deck (team, in progress).*
+- [x] **D5 (by 01:00)** Hide the old population panels from the main path; keep them on a
+  `/proof` page for the bench. ✅ *done Sun 01:00 (W-D routing + W-C page): every path is the panel;
+  `/proof` shows the wing bench chart and tables; the old population dashboard is at `/population`.*
 - [ ] **D6 (by 04:30)** Fallback video from the final recording, kept on two laptops.
+  *How (needs a person at the screen): `make demo`, reset the wing, put Onshape and the panel side by side,
+  Cmd+Shift+5 → record, run the demo prompt to the "Darwin: …" version (~2.5 min), copy the file to two
+  laptops and the team drive. If Onshape is down: `make replay` and record the panel only.*
 
 **Standalone acceptance:** `npm test` and the build pass against the mock server; the panel
 renders the full sample session.

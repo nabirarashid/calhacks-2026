@@ -127,3 +127,9 @@ def test_locked_params_never_change(client, monkeypatch):
     assert all(e["payload"]["design"]["params"]["chord_mm"] == 280.0 for e in events if e["type"] == "design_evaluated")
     r = client.post("/api/sessions", json={"doc_url": URL, "prompt": "Cut drag. Only change the chord."})
     assert r.status_code == 422 and "locked" in r.json()["detail"]
+
+
+def test_offline_panel_default_names_the_wing(client):
+    r = client.post("/api/inspect", json={"doc_url": "mock://rear-wing"})       # client runs with DARWIN_CAD=fake
+    assert r.status_code == 200 and r.json()["project_id"] == "rear_wing"
+    assert client.post("/api/inspect", json={"doc_url": "mock://nope"}).status_code == 404

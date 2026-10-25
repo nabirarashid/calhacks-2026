@@ -1,7 +1,7 @@
 PY ?= python
 NPM ?= npm
 
-.PHONY: contracts test mock sample dev secrets-check compile39 demo reset-wing outputs
+.PHONY: contracts test mock sample dev secrets-check compile39 demo reset-wing outputs replay
 
 contracts:            ## validate shared fixtures against the frozen models
 	$(PY) -m shared.check
@@ -34,3 +34,6 @@ reset-wing:           ## put the demo wing back to its baseline design
 
 outputs:              ## snapshot .darwin/ (recordings, ledgers, spend, landscapes, geometry, feature ids) into outputs/
 	@bash -c 'source ~/.darwin_secrets.sh; PYTHONPATH=. $(PY) scripts/export_outputs.py'
+
+replay:               ## offline fallback: replay the live wing session in the panel (no keys, no network)
+	@scripts/replay.sh

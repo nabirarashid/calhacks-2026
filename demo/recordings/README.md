@@ -1,5 +1,16 @@
 # Demo recordings (replay fallback)
 
+## `session_1925_d20d.jsonl` — THE WING, live (current — use this one)
+
+`make replay`, then open `http://localhost:5173/panel?session=session_1925_d20d`. No keys, no network.
+
+Recorded Sat Oct 24 19:25 from the panel API on the real wing Part Studio: **Claude Haiku 5.5 via
+OpenRouter** for every role, real `rear_wing_v1` solver, real Onshape writes. Prompt: "Maximize
+downforce while keeping drag under 15 N. You can change the angle of attack, span, flap angle, flap
+size and endplates." 7 steps, each citing aero principles; 5 accepted and morphed in Onshape;
+versions "Before Darwin" / "Darwin: downforce +41%". Downforce 98.1 → 138.7 N, drag 13.9 N (limit 15),
+chord held (not wired in CAD yet). 128 s, $0.019. Verified to replay with every key unset (C6).
+
 Each `.jsonl` here is a real run's full event stream. Replaying one needs **no
 network, no API keys and no Onshape**: the backend re-emits the events with their
 original timing, and the champion's STL is served from `demo/geometry/`.
@@ -23,7 +34,7 @@ curl -X POST localhost:8000/api/replay \
 
 `speed` scales the original timing (`8.0` replays a 76-second run in 9.5 s).
 
-## `demo_pitch_goal_square.jsonl` (current — use this one)
+## `demo_pitch_goal_square.jsonl` (older: the fin)
 
 Recorded Sat 12:32 with **real Claude (Haiku 5.5 + one Sonnet report) and real
 Onshape**, after the AeroSandbox race fix, the drag-normalization fix and the

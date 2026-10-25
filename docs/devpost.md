@@ -106,11 +106,18 @@ or mock results are live.
   spend explicit rather than hiding them behind the agent.
 - Preserved the earlier rocket-fin solver, recordings, and matched-budget
   baselines as a second aero example and comparison infrastructure.
-- **TODO before submission:** add the checked-in end-to-end wing recording and
-  name whether CAD writes and before/after versions completed successfully.
-- **TODO before submission:** summarize `demo/bench_wing.json` exactly—goals,
-  seeds, 20-simulation budget, simulations to target, final feasible result, and
-  the knowledge-off ablation. Do not turn a tie or loss into a win.
+- Ran the complete loop live on the FSAE-style rear wing in Onshape
+  (`demo/recordings/session_1925_d20d.jsonl`, Claude Haiku 5.5): 7 experiments, 5 accepted and
+  written to the open model with zero failed writes, versions "Before Darwin" and "Darwin:
+  downforce +41%" created. Downforce 98.1 → 138.7 N with drag 13.9 N against a 15 N limit, in 128 s
+  for $0.019 of model spend. Chord was held fixed because it isn't wired in the CAD yet.
+- Benchmarked on the real solver (`demo/bench_wing.json`; Claude Sonnet 5.5 planning): 3 goals ×
+  3 runs, 20 simulations each, against CMA-ES and random search on the same editable parameters.
+  Median final result as % of the best design known: max downforce under 15 N drag, Darwin 98.5%,
+  CMA-ES 92.6%, random 79.1%; same with span locked, 99.3%, 90.5%, 89.9%; min drag with ≥120 N
+  downforce, 97.0%, 74.5%, 70.5%. Darwin reached 95% of the best in 8 of 9 runs (median 4–11
+  simulations), CMA-ES in 1 of 9, random in 0. Knowledge-off ablation: a tie on the easy goal
+  (98.7% vs 98.5%), behind on the two harder ones (94.9% vs 99.3%; 90.2% vs 97.0%).
 
 ## What we learned
 
@@ -143,9 +150,10 @@ is validated deeply in this domain.
 
 ## Evidence to verify before publishing
 
-- [ ] Replace both benchmark TODOs with results from `demo/bench_wing.json`.
-- [ ] Link or name the final scrubbed wing recording; label replay footage.
-- [ ] Confirm the final run created both Onshape versions and had zero failed
+- [x] Replace both benchmark TODOs with results from `demo/bench_wing.json`.
+- [x] Link or name the final scrubbed wing recording; label replay footage.
+      (`demo/recordings/session_1925_d20d.jsonl`; `make replay` plays it offline.)
+- [x] Confirm the final run created both Onshape versions and had zero failed
       writes before claiming the complete live loop.
 - [ ] Copy validation wording from the final rear-wing section of
       `sim/PHYSICS.md`; never call the screening solver CFD.
