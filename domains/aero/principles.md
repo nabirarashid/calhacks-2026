@@ -1,6 +1,6 @@
 ## all
 The part is an aerodynamic lifting surface: a race-car rear wing (downforce) or a rocket fin set. Designs are evaluated by a fast lifting-surface solver; every number comes from the solver, never from you.
-Principles below are tagged "Rear wing:" or "Rocket fin:" by the part they apply to; use only those for the part in front of you, plus the untagged general ones. Strength words describe the typical change from one modest step of a lever (about 1 deg of angle, 3 deg of flap, 50 mm of span, 30 mm of endplate): small is under 2 %, moderate 2-6 %, strong over 6 %. A lever's strength changes with the design's state, and several principles say how.
+Principles below are tagged "Rear wing:" or "Rocket fin:" by the part they apply to; use only those for the part in front of you, plus the untagged general ones. Strength words describe the typical change from one modest step of a lever (about 1 deg of angle, 3 deg of flap, 50 mm of span, 30 mm of endplate): small is under 2 %, moderate 2-6 %, strong over 6 %. Effects always describe raising the lever. A lever's strength changes with the design's state, and several principles say how.
 
 <!--
 Principles: one "### ID" block each, in this exact format (PLAN.md B.8). Content: W-B.
@@ -74,10 +74,10 @@ source: Abbott & von Doenhoff, Theory of Wing Sections, ch. 4 and appendix data 
 check: aoa_deg=0; flap_angle_deg=0; step flap_angle_deg +3
 
 ### P-LOW-AR-SLOPE
-statement: Rear wing: at aspect ratio about 3 the lift-curve slope is far below the section's, because tip downwash cuts the effective angle. Raising effective aspect ratio (endplates, span) raises the slope and the downforce at a given angle.
+statement: Rear wing: at aspect ratio about 3 the lift-curve slope is far below the section's, because tip downwash cuts the effective angle. Raising effective aspect ratio with endplates raises the slope and the downforce at a given angle. Span raises aspect ratio too but also adds area and lift, so its raw induced drag rises (see P-SPAN-AREA-AR).
 applies_when: wings with aspect ratio below about 6
 effects: downforce_n: up (small); cl: up (small); drag_induced_n: down (moderate)
-levers: endplate_height_mm, span_mm
+levers: endplate_height_mm
 source: Raymer, Aircraft Design: A Conceptual Approach, ch. 12 (Helmbold/DATCOM lift-curve slope)
 check: step endplate_height_mm +30
 
@@ -98,12 +98,12 @@ source: Hoerner and Borst, Fluid-Dynamic Lift, ch. on plain flaps; Abbott & von 
 check: flap_angle_deg=24; step flap_angle_deg +3
 
 ### P-FLAP-TRIM
-statement: Rear wing: from the default 15 deg, trimming 3 deg of flap costs about 2.5 % downforce but cuts drag about 9.5 % and returns 0.5 deg of stall margin. Under a drag limit, trim flap and spend the freed drag on span (flap 12 deg + span 900 mm: +3.7 % downforce, -6.5 % drag vs the default).
+statement: Rear wing: near the default 15 deg, more flap buys little downforce for much drag (+3 deg: about +1 % downforce, +9.5 % drag, -0.5 deg stall margin), so trimming 3 deg costs only about 2.5 % downforce and cuts drag about 9.5 %. Under a drag limit, trim flap and spend the freed drag on span (flap 12 deg + span 900 mm: +3.7 % downforce, -6.5 % drag vs the default).
 applies_when: flap at or above about 15 deg, goal with a drag limit or L/D objective
-effects: downforce_n: down (small); drag_n: down (strong); drag_profile_n: down (strong); l_over_d: up (strong); stall_margin_deg: up
+effects: downforce_n: up (small); drag_n: up (strong); drag_profile_n: up (strong); l_over_d: down (strong); stall_margin_deg: down
 levers: flap_angle_deg
 source: Abbott & von Doenhoff, Theory of Wing Sections, ch. 6 and 8 (drag of flapped sections); Katz, Race Car Aerodynamics
-check: step flap_angle_deg -3
+check: step flap_angle_deg +3
 
 ### P-FLAP-CHORD
 statement: Rear wing: a larger flap chord fraction makes the same flap angle more effective (Glauert). In this model it is strongest at the default 15 deg of flap (+6 % downforce, +9 % drag per +0.03), weak at 5 deg (+1 %), with an optimum above 20 deg (P-FLAP-CHORD-OPTIMUM).
@@ -114,12 +114,12 @@ source: Glauert, The Elements of Aerofoil and Airscrew Theory, ch. on hinged fla
 check: step flap_chord_frac +0.03
 
 ### P-FLAP-CHORD-OPTIMUM
-statement: Rear wing: with 20+ deg of flap, downforce peaks at a flap chord fraction of about 0.32-0.36 and falls beyond, while profile drag rises and stall margin shrinks; at 25-30 deg of flap the larger fractions stall. Below 15 deg of flap, more fraction helps up to 0.40.
+statement: Rear wing: with 20+ deg of flap, downforce peaks at a flap chord fraction of about 0.32-0.36 and falls beyond, while profile drag rises and stall margin tends to shrink; at 25-30 deg of flap the larger fractions stall. Below 15 deg of flap, more fraction helps up to 0.40.
 applies_when: flap deflection 20 deg or more
-effects: downforce_n: down (small); drag_profile_n: up (strong); l_over_d: down (small); stall_margin_deg: down
+effects: downforce_n: down (small); drag_profile_n: up (strong); l_over_d: down (small)
 levers: flap_chord_frac
 source: Hoerner and Borst, Fluid-Dynamic Lift, ch. on plain flaps (separation at large chord ratio and deflection); Abbott & von Doenhoff, ch. 8
-check: flap_angle_deg=20; flap_chord_frac=0.36; step flap_chord_frac +0.03
+check: flap_angle_deg=20; flap_chord_frac=0.37; step flap_chord_frac +0.03
 
 ### P-PLAIN-VS-SLOTTED
 statement: Rear wing: real race-car flaps are slotted, so air through the gap keeps them attached to larger angles. This solver models a plain flap: its maximum downforce is conservative and it saturates earlier than a real wing.
@@ -247,10 +247,10 @@ source: Barrowman and Barrowman, NARAM-8 (1966); Martin, NACA TN 4197 (1958); St
 check: step root_chord +10
 
 ### P-FIN-FLUTTER-THICKNESS
-statement: Rocket fin: the flutter boundary rises steeply with thickness, roughly as (thickness / chord)^1.5, so thin fins flutter first. Thickening is the most direct fix for a flutter violation, at a cost in mass and drag.
+statement: Rocket fin: the flutter boundary rises steeply with thickness, roughly as (thickness / chord)^1.5, so thin fins flutter first. Thickening is the most direct fix for a flutter violation, at a cost in mass and drag. More root chord at fixed thickness lowers t/c and so lowers flutter margin (see P-FIN-ROOT-CHORD).
 applies_when: thin plate fins, isotropic material
 effects: flutter_margin: up (strong); fin_mass_total_g: up (strong); drag_n: up (strong)
-levers: thickness, root_chord
+levers: thickness
 source: Martin, Summary of Flutter Experiences as a Guide to the Preliminary Design of Lifting Surfaces on Missiles, NACA TN 4197 (1958)
 check: step thickness +0.5
 
@@ -265,10 +265,10 @@ check: step thickness +0.5
 ### P-FIN-COUNT
 statement: Rocket fin: four fins give more stability than three, with about a third more fin drag and mass; flutter margin is a per-fin property and does not change.
 applies_when: three or four identical fins
-effects: stability_margin_cal: down (strong); drag_n: down (strong); fin_mass_total_g: down (strong); flutter_margin: flat
+effects: stability_margin_cal: up (strong); drag_n: up (strong); fin_mass_total_g: up (strong); flutter_margin: flat
 levers: fin_count
 source: Barrowman and Barrowman, NARAM-8 (1966) (normal force scales with fin count)
-check: step fin_count -1
+check: fin_count=3; step fin_count +1
 
 ### P-FIN-BASE-DRAG
 statement: Rocket fin: square-edged fins get most of their drag from base pressure behind the blunt trailing edge, which scales with thickness times span; root chord (+0.5 % per 10 mm), taper and sweep barely change drag.

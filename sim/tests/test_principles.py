@@ -162,3 +162,88 @@ def test_principle_effects_agree_with_the_solver(pid):
             lo, hi = STRENGTH_BANDS[strength]
             assert lo <= abs(change) <= hi, "%s: %s claimed %s, moved %+.2f %%" % (
                 pid, metric, strength, change)
+
+
+# ---- added Sat 23:50 after an audit found 10 wrong claims the single check missed ----
+#
+# The check above verifies one lever at one state. The audit found every error elsewhere:
+# a principle listing a second lever its check never stepped (span in P-LOW-AR-SLOPE, root
+# chord in P-FIN-FLUTTER-THICKNESS), and principles written for LOWERING their lever, which
+# the model reads as the effect of raising it ("flap: downforce down"). These three tests
+# close those gaps.
+
+STEP = {"aoa_deg": 1.0, "flap_angle_deg": 3.0, "span_mm": 50.0, "endplate_height_mm": 30.0,
+        "chord_mm": 20.0, "flap_chord_frac": 0.03, "root_chord": 10.0, "taper_ratio": 0.1,
+        "semi_span": 10.0, "sweep_deg": 10.0, "thickness": 0.5, "fin_count": 1.0}
+
+
+def _space_for(lever):
+    return WING if lever in {p.name for p in WING.parameters} else FIN
+
+
+def _holds(metric, direction, before, after):
+    if metric in ABSOLUTE:
+        change, flat = after[metric] - before[metric], FLAT_ABS
+    else:
+        change, flat = 100.0 * (after[metric] - before[metric]) / abs(before[metric]), FLAT_PCT
+    if direction == "flat":
+        return abs(change) < flat, change
+    return (change > 0 if direction == "up" else change < 0), change
+
+
+def test_every_check_raises_its_lever():
+    """Effects must describe raising the lever: the model has no other way to read them."""
+    lowered = [pid for pid, (_, _, delta) in CHECKS.items() if delta <= 0]
+    assert not lowered, "check lines that lower their lever: %s" % lowered
+    assert "Effects always describe raising the lever" in TEXT
+
+
+@pytest.mark.parametrize("pid", sorted(CHECKS))
+def test_every_listed_lever_moves_the_way_the_effects_say(pid):
+    principle = [p for p in PRINCIPLES if p["id"] == pid][0]
+    overrides = CHECKS[pid][0]
+    if principle["levers"].startswith("none"):
+        return
+    for lever in (x.strip() for x in principle["levers"].split(",")):
+        space = _space_for(lever)
+        spec = [s for s in space.parameters if s.name == lever][0]
+        start = {s.name: s.default for s in space.parameters}
+        start.update(overrides)
+        if start[lever] + STEP[lever] > spec.max:
+            start[lever] = spec.max - STEP[lever]
+        stepped = dict(start)
+        stepped[lever] = start[lever] + STEP[lever]
+        before, after = _evaluate(space, start), _evaluate(space, stepped)
+        for metric, direction, _ in _effects(principle):
+            ok, change = _holds(metric, direction, before, after)
+            assert ok, "%s: raising %s moves %s %+.3f, but effects say %s" % (
+                pid, lever, metric, change, direction)
+
+
+@pytest.mark.parametrize("pid", sorted(CHECKS))
+def test_claims_hold_at_neighbouring_designs(pid):
+    """True at the check point is not enough; a principle has to describe a region.
+    Every other continuous lever is nudged by up to 8 % of its range, six times (seeded)."""
+    import random
+    principle = [p for p in PRINCIPLES if p["id"] == pid][0]
+    overrides, lever, delta = CHECKS[pid]
+    space = _space_for(lever)
+    specs = {s.name: s for s in space.parameters}
+    rng = random.Random(hash(pid) & 0xFFFF)
+    held = total = 0
+    for _ in range(6):
+        start = {s.name: s.default for s in space.parameters}
+        start.update(overrides)
+        for name, spec in specs.items():
+            if name == lever or name in overrides or spec.kind != "continuous":
+                continue
+            start[name] = min(spec.max, max(spec.min, start[name] + rng.uniform(-0.08, 0.08)
+                                            * (spec.max - spec.min)))
+        stepped = dict(start)
+        stepped[lever] = start[lever] + delta
+        before, after = _evaluate(space, start), _evaluate(space, stepped)
+        for metric, direction, _ in _effects(principle):
+            held += _holds(metric, direction, before, after)[0]
+            total += 1
+    assert held >= 0.8 * total, "%s: only %d of %d claims hold near the check state" % (
+        pid, held, total)
