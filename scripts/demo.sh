@@ -22,7 +22,9 @@ ids = adopted_ids(did, eid)
 print('adopted Darwin variables:', ', '.join(sorted(ids)) or 'NONE (copy .darwin/feature_ids from the setup laptop)')
 sys.exit(0 if len(ids) == 6 else 1)
 "
-lsof -ti tcp:8000 -sTCP:LISTEN >/dev/null && { echo "port 8000 is busy: stop the old backend first"; exit 1; }
+for port in 8000 5173; do
+  lsof -ti tcp:$port -sTCP:LISTEN >/dev/null && { echo "port $port is busy (an old Darwin server?): run  make stop  first"; exit 1; }
+done
 "$PY" -m backend.server &
 BACKEND=$!
 trap 'kill $BACKEND 2>/dev/null' EXIT

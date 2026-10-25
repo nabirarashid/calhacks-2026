@@ -4,7 +4,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 PY="${PY:-$HOME/.venvs/darwin/bin/python}"
 SESSION="${SESSION:-session_1925_d20d}"
-lsof -ti tcp:8000 -sTCP:LISTEN >/dev/null && { echo "port 8000 is busy: stop the live backend first"; exit 1; }
+for port in 8000 5173; do
+  lsof -ti tcp:$port -sTCP:LISTEN >/dev/null && { echo "port $port is busy (an old Darwin server?): run  make stop  first"; exit 1; }
+done
 DARWIN_CAD=off DARWIN_LLM_PROVIDER=mock DARWIN_MODE=replay "$PY" -m backend.server &
 BACKEND=$!
 trap 'kill $BACKEND 2>/dev/null' EXIT

@@ -1,7 +1,7 @@
 PY ?= python
 NPM ?= npm
 
-.PHONY: contracts test mock sample dev secrets-check compile39 demo reset-wing outputs replay
+.PHONY: contracts test mock sample dev secrets-check compile39 demo reset-wing outputs replay stop
 
 contracts:            ## validate shared fixtures against the frozen models
 	$(PY) -m shared.check
@@ -37,3 +37,6 @@ outputs:              ## snapshot .darwin/ (recordings, ledgers, spend, landscap
 
 replay:               ## offline fallback: replay the live wing session in the panel (no keys, no network)
 	@scripts/replay.sh
+
+stop:                 ## stop any Darwin backend (:8000) and panel (:5173) still running
+	@kill $$(lsof -ti tcp:8000 -sTCP:LISTEN) $$(lsof -ti tcp:5173 -sTCP:LISTEN) 2>/dev/null; echo "stopped Darwin servers (if any)"
