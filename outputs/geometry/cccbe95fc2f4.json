@@ -1,0 +1,20 @@
+{
+  "bbox_mm": [
+    0.0,
+    -1.4,
+    -0.0,
+    87.362,
+    1.4,
+    58.0
+  ],
+  "elapsed_ms": 439.78,
+  "error": "volume off by 16.5 % (want 9182.8 mm3, got 10698.1 mm3)",
+  "geometry_key": "cccbe95fc2f4",
+  "onshape_calls": 2,
+  "regen_status": "SANITY_FAIL",
+  "source": "onshape_config",
+  "status": "failed",
+  "stl_url": "/api/geometry/cccbe95fc2f4.stl",
+  "triangles": 12,
+  "volume_mm3": 10698.1
+}

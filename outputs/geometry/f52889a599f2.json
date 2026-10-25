@@ -1,0 +1,20 @@
+{
+  "bbox_mm": [
+    0.0,
+    -6.0,
+    -0.0,
+    76.9615,
+    6.0,
+    30.0
+  ],
+  "elapsed_ms": 480.41224479675293,
+  "error": null,
+  "geometry_key": "f52889a599f2",
+  "onshape_calls": 5,
+  "regen_status": "OK",
+  "source": "onshape_feature",
+  "status": "ready",
+  "stl_url": "/api/geometry/f52889a599f2.stl",
+  "triangles": 12,
+  "volume_mm3": 13500.0
+}

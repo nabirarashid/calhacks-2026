@@ -1,7 +1,7 @@
 PY ?= python
 NPM ?= npm
 
-.PHONY: contracts test mock sample dev secrets-check compile39 demo reset-wing
+.PHONY: contracts test mock sample dev secrets-check compile39 demo reset-wing outputs
 
 contracts:            ## validate shared fixtures against the frozen models
 	$(PY) -m shared.check
@@ -31,3 +31,6 @@ demo:                 ## demo laptop: live backend + panel in one command (PLAN.
 
 reset-wing:           ## put the demo wing back to its baseline design
 	@bash -c 'source ~/.darwin_secrets.sh && PYTHONPATH=. $(PY) scripts/reset_wing.py'
+
+outputs:              ## snapshot .darwin/ (recordings, ledgers, spend, landscapes, geometry, feature ids) into outputs/
+	@bash -c 'source ~/.darwin_secrets.sh; PYTHONPATH=. $(PY) scripts/export_outputs.py'

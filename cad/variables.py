@@ -207,13 +207,28 @@ def _ids_path(did: str, eid: str) -> str:
     return os.path.join(d, "%s_%s.json" % (did, eid))
 
 
+_COMMITTED_IDS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                              "projects", "rear_wing", "onshape_feature_ids.json")
+
+
 def adopted_ids(did: str, eid: str) -> Dict[str, str]:
-    """{param: featureId} of Darwin's own Variable features in this Part Studio, or {} if not adopted."""
+    """{param: featureId} of Darwin's own Variable features in this Part Studio, or {} if not adopted.
+    Falls back to the committed wing ids (make outputs) when this is the DARWIN_DOC_WING Part Studio,
+    so a teammate's laptop needs no copied files."""
+    paths = [_ids_path(did, eid)]
     try:
-        with open(_ids_path(did, eid)) as fh:
-            return dict(json.load(fh))
-    except (OSError, ValueError):
-        return {}
+        wing = parse_doc_url(os.environ.get("DARWIN_DOC_WING", ""))
+        if (wing[0], wing[2]) == (did, eid):
+            paths.append(_COMMITTED_IDS)
+    except ValueError:
+        pass
+    for path in paths:
+        try:
+            with open(path) as fh:
+                return dict(json.load(fh))
+        except (OSError, ValueError):
+            continue
+    return {}
 
 
 def _variables_api(c: Any, did: str, wid: str, eid: str, purpose: str) -> Dict[str, Dict[str, Any]]:

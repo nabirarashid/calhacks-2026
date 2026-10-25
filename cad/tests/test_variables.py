@@ -72,7 +72,8 @@ class Resp:
 def cad(monkeypatch, tmp_path):
     from cad import api, cache
     monkeypatch.chdir(tmp_path)                        # cache.store writes .darwin/geometry relative to cwd
-    monkeypatch.setenv("DARWIN_CACHE_DIR", str(tmp_path / ".darwin"))   # no adopted ids from other tests
+    monkeypatch.setenv("DARWIN_CACHE_DIR", str(tmp_path / ".darwin"))
+    monkeypatch.setattr(variables, "_COMMITTED_IDS", str(tmp_path / "no_committed_ids.json"))   # no adopted ids from other tests
     monkeypatch.setenv("DARWIN_DOC_WING", URL)
     monkeypatch.setenv("DARWIN_ONSHAPE_WRITE_DOCS", "DARWIN_DOC_FIN,DARWIN_DOC_WING")
     led = FakeLedger()
@@ -273,6 +274,7 @@ def adopted(monkeypatch, tmp_path):
     monkeypatch.setenv("DARWIN_DOC_WING", URL)
     monkeypatch.setenv("DARWIN_ONSHAPE_WRITE_DOCS", "DARWIN_DOC_WING")
     monkeypatch.setenv("DARWIN_CACHE_DIR", str(tmp_path / ".darwin"))
+    monkeypatch.setattr(variables, "_COMMITTED_IDS", str(tmp_path / "no_committed_ids.json"))
     led = FakeLedger()
     client = AdoptedClient(led)
     monkeypatch.setattr(api, "_get_ledger", lambda: led)
@@ -298,3 +300,15 @@ def test_adopted_regen_failure_reverts(adopted):
     adopted.regen = "ERROR"
     ref = variables.apply_values(URL, {"aoa_deg": 40.0}, {"aoa_deg": "deg"})
     assert ref.status == "failed" and "reverted" in ref.error and len(adopted.posts) == 3      # add, write, revert
+
+
+def test_committed_wing_ids_are_used_when_the_local_file_is_missing(monkeypatch, tmp_path):
+    committed = tmp_path / "onshape_feature_ids.json"
+    committed.write_text('{"aoa_deg": "Fabc_0"}')
+    monkeypatch.setenv("DARWIN_CACHE_DIR", str(tmp_path / ".darwin"))
+    monkeypatch.setattr(variables, "_COMMITTED_IDS", str(committed))
+    monkeypatch.setenv("DARWIN_DOC_WING", URL)
+    from cad.onshape_client import parse_doc_url
+    did, _, eid = parse_doc_url(URL)
+    assert variables.adopted_ids(did, eid) == {"aoa_deg": "Fabc_0"}
+    assert variables.adopted_ids("f" * 24, eid) == {}          # another document never borrows the wing's ids
