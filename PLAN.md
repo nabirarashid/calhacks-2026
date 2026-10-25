@@ -406,7 +406,7 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 ## Part C: The four sections
 
 **Progress (Sat 19:30) — THE DEMO IS THE WING** (document "calhacks2", Part Studio `rear_wing`; the
-trapezoid/fin is retired). Done: A1, A3, A5, B1–B5, C1–C5, D1–D3.
+trapezoid/fin is retired). Done: A1, A2 (except chord → A2b), A3, A5, B1–B5, C1–C5, D1–D3.
 - **A5 done live (19:25):** prompt via the panel API → Haiku 5.5 (OpenRouter) plans 7 steps, every one
   citing principles → 5 accepted steps morph the wing in Onshape → versions "Before Darwin" and
   "Darwin: downforce +41%". Downforce 98.1 → 138.7 N with drag 13.9 N (limit 15). 128 s, $0.019.
@@ -421,8 +421,12 @@ trapezoid/fin is retired). Done: A1, A3, A5, B1–B5, C1–C5, D1–D3.
   fine. Darwin writes by "adopted" feature id and never reads the feature list. Don't delete the six
   `Darwin: <name>` Variable features (the original six can go).
 - **LLM:** OpenRouter, Haiku 5.5 for every role (B.9).
-- **Open:** chord in CAD (W-A), A6, C6 recordings, D4–D6; the extension (D1) still needs one try in
-  real Chrome.
+- **Demo-day safety:** the demo never uses the exhausted endpoint (a session is ~31 Onshape calls on
+  buckets showing 400–3,000 left). If a bucket did run out, sessions refuse to start (clear message)
+  or continue in simulation only. Backup: a teammate's Onshape API keys with the wing shared to them
+  (separate quotas, 2-minute swap); C6 replay and D6 video as the last resort.
+- **Open:** A2b chord (W-A), A6, C6 recordings, D4–D6, backup Onshape keys; the extension (D1) still
+  needs one try in real Chrome.
 
 *Earlier (Sat 18:55): the fin worked end to end on the trapezoid copy (now retired).*
 
@@ -443,8 +447,10 @@ W-A (A2 wing Part Studio) or W-D (D1 extension). W-C did A3 (`cad/variables.py`)
 
 **Checklist:**
 - [x] **A1 Morph spike** — done 14:49 (W-C): feature updates morph live; configuration updates don't.
-- [ ] **A2 (by 18:00) Rear-wing Part Studio**, built on a dev account: *(W-A reports done, Sat 18:50;
-  W-C verifies with `ensure_variables` + a live morph as soon as the document URL arrives)*
+- [x] **A2 (by 18:00) Rear-wing Part Studio**, built on a dev account: ✅ *done (W-A), verified 19:40 by
+  W-C: all six Variables named per B.5; `aoa_deg`, `span_mm`, `flap_angle_deg`, `flap_chord_frac` and
+  `endplate_height_mm` drive the geometry; all four parts stay solid at the all-max, all-min and mixed
+  corners of the B.5 ranges. Exception: `chord_mm` → A2b.*
   - one **Variable feature per B.5 param** at the top of the feature list, named exactly as in B.5
   - **dimensions per B.5 "Geometry definition"** — `#chord_mm` is the *total* chord (W-B, 16:15)
   - main element: airfoil profile from imported points or a spline, inverted, chord
@@ -457,6 +463,9 @@ W-A (A2 wing Part Studio) or W-D (D1 extension). W-C did A3 (`cad/variables.py`)
   - uprights/mounts: fixed
   - Check every corner of the B.5 ranges regenerates; narrow a range and tell W-B before CP-C
     if one doesn't.
+- [ ] **A2b `chord_mm` drives the airfoil** (W-A): today the airfoil stays 280 mm whatever `chord_mm`
+  says. Scale the main element by `(1 - #flap_chord_frac) * #chord_mm` and the flap by
+  `#flap_chord_frac * #chord_mm`. Until then the server runs with `DARWIN_LOCKED_PARAMS=chord_mm`.
 - [x] **A3 (by 19:30) `cad/variables.py`** (B.7). ✅ *done 15:50 by W-C: live-verified on the disposable copy (a Variable drove the extrude 3 → 12 mm in 0.8 s); 8 mocked tests; see `cad/SPIKE.md`*
   - `list_variables`, `apply_values`, `create_version`
   - mocked tests from a sanitized feature-list fixture
