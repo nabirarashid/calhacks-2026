@@ -8,6 +8,8 @@ POST /api/sessions/{run_id}/stop       -> stop after the current step (then vers
 
 A document is matched to a project by its document id against the env var named in the
 project's manifest (`cad.doc_ref`, e.g. DARWIN_DOC_WING). Document ids never leave the server.
+DARWIN_LOCKED_PARAMS=chord_mm,... holds parameters the CAD can't change yet at their current value,
+whatever the prompt allows.
 """
 import logging
 import os
@@ -121,6 +123,15 @@ def make_router(W: Any, BUS: Any, RUNS: Dict[str, Any], is_busy: Callable[[], bo
             raise HTTPException(503, str(e))
         except ValueError as e:
             raise HTTPException(422, str(e))
+        names = [p.name for p in space.parameters]
+        locked = [n for n in names if n in {x.strip() for x in os.environ.get("DARWIN_LOCKED_PARAMS", "").split(",")}]
+        if locked:
+            allowed = [n for n in (goal.editable or names) if n not in locked and n not in goal.fixed_params]
+            if not allowed:
+                raise HTTPException(422, "Everything this request may change is locked for now (%s)." % ", ".join(locked))
+            goal.editable = allowed
+            goal.assumptions = goal.assumptions + ["Held at the current value while the CAD can't change it yet: %s."
+                                                   % ", ".join(locked)]
         units = {p.name: p.unit for p in space.parameters if p.cad_driven}    # sim-only params never go to Onshape
         doc_url = body.doc_url
 

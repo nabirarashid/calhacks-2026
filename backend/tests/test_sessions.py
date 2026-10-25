@@ -114,3 +114,16 @@ def test_session_refuses_to_write_when_onshape_cannot_be_read(client, monkeypatc
     r = client.post("/api/sessions", json={"doc_url": URL, "prompt": PROMPT})
     assert r.status_code == 503 and "Onshape" in r.json()["detail"]
     assert client.post("/api/inspect", json={"doc_url": URL}).json()["source"] == "unreadable"
+
+
+def test_locked_params_never_change(client, monkeypatch):
+    monkeypatch.setenv("DARWIN_LOCKED_PARAMS", "chord_mm")
+    r = client.post("/api/sessions", json={"doc_url": URL, "max_sims": 8, "max_steps": 3,
+                                           "prompt": "More downforce under 15 N of drag. You can change the chord and span."})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["editable"] == ["span_mm"] and "chord_mm" in body["fixed"]
+    events = _wait(client, body["run_id"])
+    assert all(e["payload"]["design"]["params"]["chord_mm"] == 280.0 for e in events if e["type"] == "design_evaluated")
+    r = client.post("/api/sessions", json={"doc_url": URL, "prompt": "Cut drag. Only change the chord."})
+    assert r.status_code == 422 and "locked" in r.json()["detail"]

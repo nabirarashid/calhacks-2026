@@ -405,27 +405,24 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 
 ## Part C: The four sections
 
-**Progress (Sat 19:15) — THE DEMO IS THE WING** (document "calhacks2", Part Studio `rear_wing`; the
-trapezoid/fin is retired). Done: A1, A3, A4 (retired), B1–B5, C1–C5, D1–D3.
-- **Wing is connected and morphs live** (W-C, 19:10): the server reads its six Variables and writes them
-  in ~1.2 s per step, verified by read-back. Bounding-box checks: `aoa_deg` 6→12° (height 46→63 mm),
-  `span_mm` 850→950, `flap_angle_deg` 10→25°, `flap_chord_frac` all regenerate.
-- **W-A must fix two things in the Part Studio (A2):**
-  1. `chord_mm` drives nothing: at 330 mm the airfoil is still 280 mm (main 196 + flap 91 mm). The
-     airfoil scale must reference `#chord_mm` (main `(1 - #flap_chord_frac) * #chord_mm`, flap
-     `#flap_chord_frac * #chord_mm`).
-  2. The endplates (Parts 3 and 4) are empty bodies (zero bounding box), so `endplate_height_mm`
-     shows nothing. They need real solids of height `#endplate_height_mm`.
-  Until then, demo prompts should only allow angle of attack, span and flap (B.5 still simulates all six).
-- **Onshape quota (blocker found 18:43):** `GET /features` has its own small daily quota, exhausted until
-  ~Sun 14:45 (`Retry-After` ~71,000 s). Other endpoints are fine (writes 3,000, Variables 3,000, boxes
-  2,998, rollback ~80, versions OK). W-C added an "adopted Variables" path (`cad/variables.py`): six
-  `Darwin: <name>` Variable features sit right after the original six and are written by feature id,
-  so the demo never reads the feature list. Don't delete the `Darwin:` features. The original six
-  can be deleted (cosmetic).
-- **LLM:** OpenRouter, Haiku 5.5 for every role (B.9). Waiting for `OPENROUTER_API_KEY` to run A5 (a full
-  live wing session) with Haiku.
-- **Open:** A2 fixes (W-A), A5/A6, C6 recordings, D4–D6; extension (D1) not yet tried in real Chrome.
+**Progress (Sat 19:30) — THE DEMO IS THE WING** (document "calhacks2", Part Studio `rear_wing`; the
+trapezoid/fin is retired). Done: A1, A3, A5, B1–B5, C1–C5, D1–D3.
+- **A5 done live (19:25):** prompt via the panel API → Haiku 5.5 (OpenRouter) plans 7 steps, every one
+  citing principles → 5 accepted steps morph the wing in Onshape → versions "Before Darwin" and
+  "Darwin: downforce +41%". Downforce 98.1 → 138.7 N with drag 13.9 N (limit 15). 128 s, $0.019.
+  Wing reset to baseline afterwards.
+- **Morphs verified by bounding box:** `aoa_deg`, `span_mm`, `flap_angle_deg`, `flap_chord_frac`,
+  `endplate_height_mm` (endplates fixed by W-A 19:20: 200 → 260 mm tracks exactly).
+- **Still broken in CAD: `chord_mm`** (the airfoil stays 280 mm). The server holds it fixed with
+  `DARWIN_LOCKED_PARAMS=chord_mm` until W-A wires it (main `(1 - #flap_chord_frac) * #chord_mm`, flap
+  `#flap_chord_frac * #chord_mm`); then drop the lock and restart. CAD fixes show up live with no setup.
+- **Onshape quota:** limits are per endpoint family. `GET /features` is exhausted until ~Sun 14:45
+  (`Retry-After` ~71,000 s); writes (3,000), Variables API (3,000), boxes, parts (500), versions are
+  fine. Darwin writes by "adopted" feature id and never reads the feature list. Don't delete the six
+  `Darwin: <name>` Variable features (the original six can go).
+- **LLM:** OpenRouter, Haiku 5.5 for every role (B.9).
+- **Open:** chord in CAD (W-A), A6, C6 recordings, D4–D6; the extension (D1) still needs one try in
+  real Chrome.
 
 *Earlier (Sat 18:55): the fin worked end to end on the trapezoid copy (now retired).*
 
@@ -469,8 +466,9 @@ W-A (A2 wing Part Studio) or W-D (D1 extension). W-C did A3 (`cad/variables.py`)
   disposable trapezoid copy: five Variables (`root_chord`, `taper_ratio`, `semi_span`, `sweep_deg`,
   `thickness`) drive the sketch and extrude; live morph verified by bounding box (90×60 → 125×80 mm in
   0.8 s); full fin sessions from the panel API morph it step by step. Prod fin doc still to do (A6).*
-- [ ] **A5 (by 21:30, with W-C)** Full session on the wing: each accepted step morphs the open
-  tab; "before"/"after" versions exist; zero failed writes.
+- [x] **A5 (by 21:30, with W-C)** Full session on the wing: each accepted step morphs the open
+  tab; "before"/"after" versions exist; zero failed writes. ✅ *done 19:25 (W-C): 5/5 writes OK,
+  versions created, downforce +41%; chord locked until wired*
 - [ ] **A6 (by 01:00)** Prod copies of the wing and fin documents; set `DARWIN_DOC_WING`,
   `DARWIN_DOC_FIN` and `DARWIN_ONSHAPE_WRITE_DOCS` on the demo laptop; re-sync
   `ONSHAPE_CALLS_REMAINING`.
