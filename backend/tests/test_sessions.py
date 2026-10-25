@@ -27,7 +27,7 @@ def client(tmp_path, monkeypatch):
     app = FastAPI()
     app.include_router(make_router(w, bus, runs, lambda: any(r.thread.is_alive() for r in runs.values())))
     c = TestClient(app)
-    c.state = {"runs": runs, "bus": bus, "fake_cad": fake_cad}
+    c.state = {"runs": runs, "bus": bus, "fake_cad": fake_cad, "w": w}
     return c
 
 
@@ -133,3 +133,16 @@ def test_offline_panel_default_names_the_wing(client):
     r = client.post("/api/inspect", json={"doc_url": "mock://rear-wing"})       # client runs with DARWIN_CAD=fake
     assert r.status_code == 200 and r.json()["project_id"] == "rear_wing"
     assert client.post("/api/inspect", json={"doc_url": "mock://nope"}).status_code == 404
+
+
+def test_replay_mode_run_plays_the_recording_not_a_new_session(client, monkeypatch):
+    from backend import replay
+    monkeypatch.setitem(client.state["w"].modes, "mode", "replay")
+    r = client.post("/api/sessions", json={"doc_url": URL, "prompt": "anything at all"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["run_id"].startswith("replay_") and body["writes"] is False
+    assert body["replay_of"] == "session_1925_d20d.jsonl" and "chord_mm" in body["fixed"]
+    rep = client.state["runs"][body["run_id"]]
+    assert isinstance(rep, replay.Replayer)
+    assert client.post("/api/sessions/%s/stop" % body["run_id"]).status_code == 200

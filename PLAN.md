@@ -600,7 +600,9 @@ The structural/FEA work is parked: leave the files, stop work.
   keys. The old population loop stays as the baseline engine. ✅ *done Sun 01:05 (W-C): the live Haiku
   wing session is `demo/recordings/session_1925_d20d.jsonl`; `make replay` plays it in the panel with every
   key unset (verified: 56 events, ends at 138.7 N); offline, the panel's default document maps to the wing
-  so no error shows. Fin retired, so no fin recording; older fin recordings remain.*
+  so no error shows. Fin retired, so no fin recording; older fin recordings remain. 01:50: in replay mode
+  **Run** now plays this recording with its original timing (it used to start a new offline session on the
+  built-in fake LLM, whose results varied run to run).*
 
 **Standalone acceptance:** `make test` with fakes. This covers:
 - LLM-output validation (bad lever, out of bounds, unknown principle)

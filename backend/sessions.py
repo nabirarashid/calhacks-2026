@@ -10,6 +10,8 @@ A document is matched to a project by its document id against the env var named 
 project's manifest (`cad.doc_ref`, e.g. DARWIN_DOC_WING). Document ids never leave the server.
 DARWIN_LOCKED_PARAMS=chord_mm,... holds parameters the CAD can't change yet at their current value,
 whatever the prompt allows.
+DARWIN_MODE=replay: starting a session plays back a recorded live session (DARWIN_REPLAY_SESSION, default
+the live wing run) with its original timing, instead of running anything new (C6/D6 fallback).
 """
 import logging
 import os
@@ -22,7 +24,7 @@ from pydantic import BaseModel
 from shared.contracts import DesignSpace, Goal, GeometryRef, Objective, ParamValue
 from shared.manifest import ProjectManifest
 
-from backend import llm
+from backend import llm, replay
 from backend.agents import goal_parser
 from backend.investigator import Investigator
 from backend.run_loop import new_run_id
@@ -112,6 +114,8 @@ def make_router(W: Any, BUS: Any, RUNS: Dict[str, Any], is_busy: Callable[[], bo
         if is_busy():
             raise HTTPException(409, "a session is already running; stop it first")
         m, space = project_for(body.doc_url)
+        if W.modes.get("mode") == "replay":
+            return start_replay(m.project_id)
         if "optimize" not in m.authority.permitted:
             raise HTTPException(409, "project %s is level %d (optimize not permitted)"
                                 % (m.project_id, m.authority.maturity))
@@ -159,6 +163,24 @@ def make_router(W: Any, BUS: Any, RUNS: Dict[str, Any], is_busy: Callable[[], bo
         return {"run_id": run_id, "project_id": m.project_id, "goal": goal.model_dump(mode="json"),
                 "editable": inv.editable, "fixed": inv.fixed, "start_values_from": source, "writes": writes}
 
+    def start_replay(project_id: str) -> Dict[str, Any]:
+        """Offline fallback: play the recorded live session, never a new one (no LLM, no Onshape)."""
+        name = os.environ.get("DARWIN_REPLAY_SESSION", "session_1925_d20d") + ".jsonl"
+        path = replay.find_recording(name)
+        if path is None:
+            raise HTTPException(404, "replay recording %s not found" % name)
+        events = replay.load(path)
+        goal = Goal.model_validate(events[0]["payload"]["summary"]["goal"])
+        names = [p.name for p in W.resolve(project_id).parameters]
+        editable = list(goal.editable or names)
+        run_id = new_run_id("replay")
+        r = replay.Replayer(BUS, path, run_id, 1.0)
+        RUNS[run_id] = r
+        r.start()
+        return {"run_id": run_id, "project_id": project_id, "goal": goal.model_dump(mode="json"), "editable": editable,
+                "fixed": [n for n in names if n not in editable], "start_values_from": "recording", "writes": False,
+                "replay_of": name}
+
     def session(run_id: str) -> Investigator:
         inv = RUNS.get(run_id)
         if not isinstance(inv, Investigator):
@@ -171,6 +193,9 @@ def make_router(W: Any, BUS: Any, RUNS: Dict[str, Any], is_busy: Callable[[], bo
 
     @router.post("/api/sessions/{run_id}/stop")
     def stop(run_id: str) -> Dict[str, Any]:
+        if isinstance(RUNS.get(run_id), replay.Replayer):
+            RUNS[run_id].stop()
+            return {"run_id": run_id, "stopping": True}
         inv = session(run_id)
         inv.stop()
         return {"run_id": run_id, "stopping": True}

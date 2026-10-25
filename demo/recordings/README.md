@@ -2,7 +2,11 @@
 
 ## `session_1925_d20d.jsonl` — THE WING, live (current — use this one)
 
-`make replay`, then open `http://localhost:5173/panel?session=session_1925_d20d`. No keys, no network.
+`make replay`, then open `http://localhost:5173/panel?session=session_1925_d20d` to see the finished
+session, or open `http://localhost:5173/panel` and press **Run**: in replay mode Run plays this recording
+with its original timing (~2 min, same 138.7 N every time) and never computes anything new. The typed
+prompt is ignored, so type the recorded one. No keys, no network, no Onshape. Say it's a recording if
+you use it.
 
 Recorded Sat Oct 24 19:25 from the panel API on the real wing Part Studio: **Claude Haiku 5.5 via
 OpenRouter** for every role, real `rear_wing_v1` solver, real Onshape writes. Prompt: "Maximize
