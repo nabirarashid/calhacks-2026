@@ -24,7 +24,7 @@ from pydantic import BaseModel
 from shared.contracts import DesignSpace, Goal, GeometryRef, Objective, ParamValue
 from shared.manifest import ProjectManifest
 
-from backend import llm, replay
+from backend import geometry_check, llm, replay
 from backend.agents import goal_parser
 from backend.investigator import Investigator
 from backend.run_loop import new_run_id
@@ -145,11 +145,40 @@ def make_router(W: Any, BUS: Any, RUNS: Dict[str, Any], is_busy: Callable[[], bo
         units = {p.name: p.unit for p in space.parameters if p.cad_driven}    # sim-only params never go to Onshape
         doc_url = body.doc_url
 
+        check = {"last": None, "passed": False}  # type: Dict[str, Any]   # geometry check state (C7)
+        holder = {}  # type: Dict[str, Investigator]
+
+        def measure(bbox_mm: Optional[List[float]] = None) -> Optional[Dict[str, Any]]:
+            try:
+                last = check["last"]
+                return W.cad.measure_parts(doc_url, last["roles"] if last else None, bbox_mm)
+            except Exception as e:  # noqa: BLE001 — the check is advisory; it must never fail a step
+                log.warning("geometry check skipped: %s", e)
+                return None
+
         def apply(sp: DesignSpace, params: Dict[str, ParamValue]) -> GeometryRef:
             changed = {k: v for k, v in params.items() if k in units and v != values.get(k)}
+            if changed and check["last"] is None:
+                check["last"] = measure()
+            old = {k: values.get(k) for k in changed}
             ref = W.cad.apply_values(doc_url, changed, units)
             if ref.status == "ready":
                 values.update(changed)
+                after = measure(ref.bbox_mm) if changed and check["last"] is not None else None
+                if after is not None:
+                    problems, dead = geometry_check.compare(check["last"], after, old, changed, values)
+                    check["last"] = after
+                    inv_ = holder.get("inv")
+                    for p in problems:
+                        if inv_ is not None:
+                            inv_.message("CAD check: " + p, kind="warning")
+                    for name in dead:
+                        if inv_ is not None:
+                            inv_.lock_param(name, "Onshape's geometry doesn't change with it, so the solver's result "
+                                            "for it wouldn't be real.")
+                    if not problems and not dead and not check["passed"] and inv_ is not None:
+                        check["passed"] = True
+                        inv_.message("CAD check: Onshape's geometry matches the solver's inputs.")
             return ref
 
         run_id = new_run_id("session")
@@ -158,6 +187,7 @@ def make_router(W: Any, BUS: Any, RUNS: Dict[str, Any], is_busy: Callable[[], bo
                            apply=apply if writes else None,
                            version=(lambda name: W.cad.create_version(doc_url, name)) if writes else None,
                            pack=W.packs.get(m.project_id))
+        holder["inv"] = inv
         RUNS[run_id] = inv
         inv.start()
         return {"run_id": run_id, "project_id": m.project_id, "goal": goal.model_dump(mode="json"),

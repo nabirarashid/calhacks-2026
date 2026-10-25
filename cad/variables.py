@@ -478,6 +478,41 @@ def ensure_variables(doc_url: str, specs: List[Tuple[str, str, ParamValue]]) -> 
     return [n for n, _, _ in missing]
 
 
+# ---------------------------------------------------------------- measuring the CAD (geometry check)
+
+def measure_parts(doc_url: str, roles: Optional[Dict[str, str]] = None,
+                  bbox_mm: Optional[List[float]] = None) -> Dict[str, Any]:
+    """What Onshape actually built: {"bbox": overall [xmin..zmax] mm, "volumes": {partId: mm^3},
+    "roles": {partId: role}, "parts": {partId: [xmin..zmax] mm} for the wing parts}.
+
+    Volumes: one mass-properties call. Roles ("endplate" for thin plates across the span, else "wing")
+    are found once from every part's box and passed back in afterwards; each later measurement boxes
+    only the wing parts (the endplates enclose the wing, so the overall box can't see a flap rotate).
+    Raises OnshapeError on HTTP failure; callers treat the check as advisory.
+    """
+    c = _api()._get_client()
+    did, wid, eid = resolve_doc(doc_url, c)
+    bodies = _retry(c.request, "GET", "/partstudios/d/%s/w/%s/e/%s/massproperties" % (did, wid, eid), "verify",
+                    path_template="/partstudios/d/{did}/w/{wid}/e/{eid}/massproperties",
+                    params={"massAsGroup": "false"}).json().get("bodies", {})
+    volumes = {pid: b["volume"][0] * 1e9 for pid, b in bodies.items()}
+
+    def part_box(pid: str) -> List[float]:
+        b = _retry(c.request, "GET", "/parts/d/%s/w/%s/e/%s/partid/%s/boundingboxes" % (did, wid, eid, pid),
+                   "verify", path_template="/parts/d/{did}/w/{wid}/e/{eid}/partid/{pid}/boundingboxes").json()
+        return [round(b[k] * 1000.0, 3) for k in ("lowX", "lowY", "lowZ", "highX", "highY", "highZ")]
+    boxes = {}  # type: Dict[str, List[float]]
+    if roles is None:
+        roles = {}
+        for pid in volumes:
+            boxes[pid] = box = part_box(pid)
+            dims = sorted(box[i + 3] - box[i] for i in range(3))
+            roles[pid] = "endplate" if dims[0] < 0.05 * dims[2] and box[4] - box[1] == dims[0] else "wing"
+    parts = {pid: boxes.get(pid) or part_box(pid) for pid, role in roles.items() if role == "wing" and pid in volumes}
+    return {"bbox": bbox_mm if bbox_mm is not None else _bbox(c, did, wid, eid), "volumes": volumes, "roles": roles,
+            "parts": parts}
+
+
 def create_version(doc_url: str, name: str) -> Optional[str]:
     """Named version of the workspace ("Before Darwin", "Darwin: ..."). 1 call. Returns the version id or None."""
     if not write_allowed(doc_url) or _api()._get_ledger().hard_stop():
@@ -494,4 +529,4 @@ def create_version(doc_url: str, name: str) -> Optional[str]:
 
 __all__ = ["VALUE_PARAM", "resolve_doc", "write_allowed", "parse_literal", "parse_variables", "format_expression",
            "build_variable_feature", "list_variables", "apply_values", "ensure_variables", "create_version",
-           "adopt_variables", "adopted_ids"]
+           "adopt_variables", "adopted_ids", "measure_parts"]

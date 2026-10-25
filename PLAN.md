@@ -604,6 +604,14 @@ The structural/FEA work is parked: leave the files, stop work.
   **Run** now plays this recording with its original timing (it used to start a new offline session on the
   built-in fake LLM, whose results varied run to run).*
 
+- [x] **C7 Geometry check** (branch `geometry-check`, Sun 02:50, W-C): after every write Darwin measures the
+  wing in Onshape (part boxes + volumes, ~3 calls) and compares with what the solver assumed: the wing's width
+  must equal `span_mm`, endplate volume must scale with `endplate_height_mm`, and a parameter that moves no
+  part is locked for the rest of the run with a warning (replaces `DARWIN_LOCKED_PARAMS` guessing). Live:
+  all six parameters respond today (chord too, since W-A's fix); a full Haiku session showed "CAD check:
+  Onshape's geometry matches the solver's inputs." The solver still computes from the parameters, not the
+  CAD; running physics on the real geometry is the CFD-adapter step.
+
 **Standalone acceptance:** `make test` with fakes. This covers:
 - LLM-output validation (bad lever, out of bounds, unknown principle)
 - prediction scoring

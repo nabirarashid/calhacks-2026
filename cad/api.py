@@ -8,7 +8,7 @@ import math
 import os
 import time
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from shared.contracts import (DesignSpace, GeometryRef, ParamValue, canonicalize,
                               geometry_key)
@@ -441,6 +441,13 @@ def apply_values(doc_url: str, params: Dict[str, ParamValue], units: Dict[str, s
     """Write changed params into their Variable features so open tabs morph. Never raises."""
     from cad import variables
     return variables.apply_values(doc_url, params, units)
+
+
+def measure_parts(doc_url: str, roles: Optional[Dict[str, str]] = None,
+                  bbox_mm: Optional[List[float]] = None) -> Dict[str, object]:
+    """What Onshape built (bounding box, part volumes, part roles) for the geometry check."""
+    from cad import variables
+    return variables.measure_parts(doc_url, roles, bbox_mm)
 
 
 def create_version(doc_url: str, name: str) -> Optional[str]:

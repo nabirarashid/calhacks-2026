@@ -146,3 +146,37 @@ def test_replay_mode_run_plays_the_recording_not_a_new_session(client, monkeypat
     rep = client.state["runs"][body["run_id"]]
     assert isinstance(rep, replay.Replayer)
     assert client.post("/api/sessions/%s/stop" % body["run_id"]).status_code == 200
+
+
+def test_geometry_check_locks_a_parameter_the_cad_ignores(client, monkeypatch):
+    fake = client.state["fake_cad"]
+    real_measure = fake.measure_parts
+
+    def chord_ignored(doc_url, roles=None, bbox_mm=None):           # the Sat 19:30 wing: chord drives nothing
+        m = real_measure(doc_url, roles, bbox_mm)
+        did = fake._doc_id(doc_url)
+        saved = fake._VARIABLES[did]["chord_mm"]
+        fake._VARIABLES[did]["chord_mm"] = 280.0
+        try:
+            return real_measure(doc_url, roles, bbox_mm)
+        finally:
+            fake._VARIABLES[did]["chord_mm"] = saved
+    monkeypatch.setattr(fake, "measure_parts", chord_ignored)
+    r = client.post("/api/sessions", json={"doc_url": URL, "max_sims": 10, "max_steps": 5,
+                                           "prompt": "Cut drag. You can only change the chord."})
+    assert r.status_code == 200, r.text
+    events = _wait(client, r.json()["run_id"])
+    msgs = [e["payload"]["message"]["summary"] for e in events if e["type"] == "agent_message"]
+    assert any(m.startswith("Locked chord_mm") for m in msgs), msgs
+    writes = [e for e in events if e["type"] == "design_applied" and not e["payload"]["version"]]
+    assert len(writes) == 1                                          # nothing after the lock
+
+
+def test_geometry_check_passes_on_a_consistent_wing(client):
+    r = client.post("/api/sessions", json={"doc_url": URL, "prompt": PROMPT, "max_sims": 10, "max_steps": 4})
+    events = _wait(client, r.json()["run_id"])
+    msgs = [e["payload"]["message"]["summary"] for e in events if e["type"] == "agent_message"]
+    writes = [e for e in events if e["type"] == "design_applied" and not e["payload"]["version"]]
+    if writes:
+        assert "CAD check: Onshape's geometry matches the solver's inputs." in msgs
+    assert not any(m.startswith("Locked") or m.startswith("CAD check: Onshape's wing") for m in msgs)

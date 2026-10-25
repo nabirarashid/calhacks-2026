@@ -227,6 +227,23 @@ def apply_values(doc_url: str, params: Dict[str, ParamValue], units: Dict[str, s
                        onshape_calls=len(changed) + 2, regen_status="OK", elapsed_ms=450.0)
 
 
+def measure_parts(doc_url: str, roles: Optional[Dict[str, str]] = None,
+                  bbox_mm: Optional[List[float]] = None) -> Dict[str, object]:
+    """Fake measurement that follows the in-memory Variables like a well-built wing (geometry check)."""
+    v = {n: d["value"] for n, d in list_variables(doc_url).items()}
+    span, chord = float(v.get("span_mm", 850.0)), float(v.get("chord_mm", 280.0))
+    frac, h = float(v.get("flap_chord_frac", 0.3)), float(v.get("endplate_height_mm", 200.0))
+    aoa, flap = float(v.get("aoa_deg", 6.0)), float(v.get("flap_angle_deg", 15.0))
+    z = 0.12 * chord + chord * (aoa + flap * frac) / 60.0
+    hinge = chord / 2 - frac * chord
+    return {"bbox": [-0.6 * chord, -span / 2 - 5.0, -h / 2, 0.6 * chord, span / 2 + 5.0, h / 2],
+            "volumes": {"M": span * ((1 - frac) * chord) ** 2 * 0.08, "F": span * (frac * chord) ** 2 * 0.08,
+                        "E1": 1.2 * chord * 5.0 * h, "E2": 1.2 * chord * 5.0 * h},
+            "roles": roles or {"M": "wing", "F": "wing", "E1": "endplate", "E2": "endplate"},
+            "parts": {"M": [-chord / 2, -span / 2, 0.0, hinge, span / 2, 0.12 * chord + chord * aoa / 60.0],
+                      "F": [hinge, -span / 2, -frac * chord * (aoa + flap) / 60.0, chord / 2, span / 2, z]}}
+
+
 def create_version(doc_url: str, name: str) -> Optional[str]:
     _charge(1)
     _VERSIONS.append(name)

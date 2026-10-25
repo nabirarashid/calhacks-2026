@@ -126,6 +126,16 @@ class Investigator:
                 self.closed = True
             self.ch.emit(type_, payload)
 
+    def lock_param(self, name: str, why: str) -> None:
+        """Stop changing `name` for the rest of the run (e.g. the CAD doesn't respond to it) and say why."""
+        if name not in self.editable:
+            return
+        self.editable.remove(name)
+        self.fixed.append(name)
+        if name in self.notebook.ruled_out:
+            self.notebook.ruled_out.remove(name)
+        self.message("Locked %s: %s" % (name, why), kind="warning")
+
     def message(self, summary: str, kind: str = "status", model: str = "rules") -> None:
         self.emit("agent_message", AgentMessageEvent(message=AgentMessage(
             message_id="%s-m%d" % (self.run_id, len(self.ch.events)), run_id=self.run_id,
