@@ -1,7 +1,7 @@
 PY ?= python
 NPM ?= npm
 
-.PHONY: contracts test mock sample dev secrets-check compile39
+.PHONY: contracts test mock sample dev secrets-check compile39 demo reset-wing
 
 contracts:            ## validate shared fixtures against the frozen models
 	$(PY) -m shared.check
