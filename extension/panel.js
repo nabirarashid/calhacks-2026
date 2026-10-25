@@ -1,16 +1,21 @@
-import { dashboardPanelUrl, isOnshapeUrl } from "./url.js";
+import { dashboardPanelUrl, documentKey, isOnshapeUrl } from "./url.js";
 
 const iframe = document.querySelector("#darwin-panel");
 const status = document.querySelector("#status");
+let shownKey = null;
 
 function showStatus(message) {
   status.querySelector("p").textContent = message;
   status.hidden = false;
   iframe.hidden = true;
   iframe.removeAttribute("src");
+  shownKey = null;
 }
 
 function showPanel(documentUrl) {
+  const key = documentKey(documentUrl);
+  if (key !== null && key === shownKey) return;   // same document and element: keep the running session
+  shownKey = key;
   iframe.src = dashboardPanelUrl(documentUrl);
   iframe.hidden = false;
   status.hidden = true;

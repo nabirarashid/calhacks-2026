@@ -25,3 +25,9 @@ compile39:            ## fail fast on syntax newer than Python 3.9
 secrets-check:        ## grep the tree for anything that looks like a key
 	@! git grep -nIE "sk-ant-[A-Za-z0-9_-]{8,}|sk-[a-f0-9]{32}|sk-or-v1-[a-f0-9]{16,}|ONSHAPE_SECRET_KEY *= *[A-Za-z0-9]{8,}|[A-Za-z0-9+/]{40,}={0,2}" -- . ":!**/*.lock" ":!**/package-lock.json" ":!**/*.stl" ":!**/dist/**" || (echo "possible secret found ^" && false)
 	@echo "secrets-check OK"
+
+demo:                 ## demo laptop: live backend + panel in one command (PLAN.md A6)
+	@scripts/demo.sh
+
+reset-wing:           ## put the demo wing back to its baseline design
+	@bash -c 'source ~/.darwin_secrets.sh && PYTHONPATH=. $(PY) scripts/reset_wing.py'

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { dashboardPanelUrl, isOnshapeUrl } from "../url.js";
+import { dashboardPanelUrl, documentKey, isOnshapeUrl } from "../url.js";
 
 const extensionRoot = new URL("../", import.meta.url);
 
@@ -47,4 +47,13 @@ test("panel uses extension-owned scripts instead of inline JavaScript", async ()
 
   assert.match(html, /<script type="module" src="panel\.js"><\/script>/);
   assert.doesNotMatch(html, /<script(?![^>]+src=)[^>]*>/);
+});
+
+test("the panel key ignores Onshape's query churn but not a new element", () => {
+  const a = "https://cad.onshape.com/documents/a/w/b/e/c?renderMode=0&uiState=1";
+  const b = "https://cad.onshape.com/documents/a/w/b/e/c?renderMode=0&uiState=2";
+  const other = "https://cad.onshape.com/documents/a/w/b/e/d?uiState=2";
+  assert.equal(documentKey(a), documentKey(b));
+  assert.notEqual(documentKey(a), documentKey(other));
+  assert.equal(documentKey("not a url"), null);
 });

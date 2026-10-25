@@ -11,6 +11,17 @@ export function isOnshapeUrl(value) {
   }
 }
 
+// Onshape rewrites the query (?uiState=...) as you click around; only the path names the document
+// and element, so the panel reloads only when the path changes (a reload would drop the session view).
+export function documentKey(value) {
+  try {
+    const url = new URL(value);
+    return url.origin + url.pathname;
+  } catch {
+    return null;
+  }
+}
+
 export function dashboardPanelUrl(documentUrl) {
   const url = new URL(DASHBOARD_PANEL_URL);
   url.searchParams.set("doc", documentUrl);

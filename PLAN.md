@@ -478,9 +478,18 @@ W-A (A2 wing Part Studio) or W-D (D1 extension). W-C did A3 (`cad/variables.py`)
 - [x] **A5 (by 21:30, with W-C)** Full session on the wing: each accepted step morphs the open
   tab; "before"/"after" versions exist; zero failed writes. ✅ *done 19:25 (W-C): 5/5 writes OK,
   versions created, downforce +41%; chord locked until wired*
-- [ ] **A6 (by 01:00)** Prod copies of the wing and fin documents; set `DARWIN_DOC_WING`,
-  `DARWIN_DOC_FIN` and `DARWIN_ONSHAPE_WRITE_DOCS` on the demo laptop; re-sync
-  `ONSHAPE_CALLS_REMAINING`.
+- [ ] **A6 (by 01:00)** Demo laptop ready. *Revised Sat 19:50: the wing already lives on the prod
+  account (Hannah's) and the fin is retired, so no copies (a copy would also cut W-A off from the
+  chord fix).* Steps:
+  - [x] one command: `make demo` (`scripts/demo.sh`) starts the live backend and the panel, checks the
+    six adopted `Darwin:` Variables, prints the panel link; `make reset-wing PY=~/.venvs/darwin/bin/python`
+    puts the wing back to baseline (W-C, 19:50)
+  - [ ] in `~/.darwin_secrets.sh` on the demo laptop: `DARWIN_DOC_WING` (wing URL), `OPENROUTER_API_KEY`,
+    and `ONSHAPE_CALLS_REMAINING` raised with a fresh `_AT` time (the local counter would otherwise
+    stop writes at its 400 reserve although Onshape's real limits are per endpoint)
+  - [ ] if the demo laptop isn't Hannah's: copy `.darwin/feature_ids/` from hers (never re-run
+    `adopt_variables`, it would add a second set of `Darwin:` features)
+  - [ ] backup Onshape API keys from a teammate's account, wing shared to it with edit access
 
 **Standalone acceptance (zero network):** `pytest cad/tests` covers: variable lookup by name;
 the expression format per unit; refusal for documents not in the write allowlist; refusal below
@@ -601,7 +610,9 @@ The structural/FEA work is parked: leave the files, stop work.
 - slides, the video
 
 **Checklist:**
-- [x] **D1 (by 17:00) `extension/`:** ✅ *done 16:16 (W-D, `498ee89`); checked by W-C against every criterion from code and its 4 tests; not yet tried in a real Chrome window* Chrome MV3, `sidePanel` permission, panel enabled only on
+- [x] **D1 (by 17:00) `extension/`:** *(19:50, W-C: the panel no longer reloads when Onshape rewrites
+  `?uiState=` as you click; it reloads only for a new document/element. Still to try once in real Chrome:
+  `chrome://extensions` → Developer mode → Load unpacked → `extension/`.)* ✅ *done 16:16 (W-D, `498ee89`); checked by W-C against every criterion from code and its 4 tests; not yet tried in a real Chrome window* Chrome MV3, `sidePanel` permission, panel enabled only on
   `cad.onshape.com` tabs (`sidePanel.setOptions` + `tabs.onUpdated`). It reads the active tab
   URL and loads `http://localhost:5173/panel?doc=<encoded url>` in an iframe. Load it unpacked.
 - [x] **D2 (by 19:00) `/panel` route** ✅ *done 16:16 (W-D, `4054b46`): all six panel elements present, tests pass; it doesn't render `design_applied` (morph) events yet, which belongs to D3* (~400 px wide), built against `sample_investigation.jsonl`
