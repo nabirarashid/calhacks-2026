@@ -222,7 +222,7 @@ class AgentMessage(BaseModel):
     generation: Optional[int] = None
     agent: Literal["goal_parser", "proposer", "critic", "strategist", "reporter", "system"]
     kind: Literal["proposal", "insight", "warning", "directive", "report", "status"]
-    model: str                                 # "claude-haiku-5-5" | "rules" | "mock" | "replay"
+    model: str                                 # e.g. "deepseek-v4-pro" | "claude-sonnet-5-5" | "rules" | "mock" | "replay"
     summary: str                               # one line for the feed
     body: str = ""                             # short markdown; numbers come from data, not the LLM
     refs: List[str] = Field(default_factory=list)   # design_ids mentioned
@@ -263,7 +263,7 @@ class ModelBudget(BaseModel):
     calls_cap_run: int
     spend_run_usd: float
     spend_cap_run_usd: float
-    spend_total_usd: float                     # local ledger; Anthropic Console is ground truth
+    spend_total_usd: float                     # local ledger per provider; the provider's console is ground truth
     spend_cap_total_usd: float
 
 

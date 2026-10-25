@@ -80,6 +80,11 @@ More details: "CalHacks_Hyphenate_Track" (linked doc).
 
 **Prize:** $5,000 in Claude credits + 1 year of Claude Max 20x + Office Hours.
 
+> **At risk (Sat Oct 24 evening):** the running product now defaults to DeepSeek, so criterion 4
+> ("thoughtful use of Claude") no longer holds for the live demo. Claude is still a supported
+> provider (`DARWIN_LLM_PROVIDER=anthropic`), and the C5 bench and the recordings were made with
+> Claude. Decide as a team whether to keep this track (demo on Claude) or drop it.
+
 #### Best Use of Factory Droid SDK (Factory)
 **Eligibility:** The project must use the Droid SDK (TypeScript or Python) in a meaningful way. Droid should do real work in the running product, not just help you write code. The repo README should explain where and how Droid is used.
 

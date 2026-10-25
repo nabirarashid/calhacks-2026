@@ -131,7 +131,7 @@ Everything else keeps its current owner (sim W-B, cad W-A, backend + shared W-C,
 
 ### B.3 The loop (what every section builds toward)
 One **step** = one small experiment:
-1. **Plan** (LLM, Sonnet 5.5). Input: goal, editable params with bounds and current values,
+1. **Plan** (LLM, the deep model: DeepSeek V4 Pro, B.9). Input: goal, editable params with bounds and current values,
    the fixed list, the current design's metrics and breakdown, the notebook, the principles
    file, the last step's result. Output: a `Hypothesis` (B.4). Validated by code:
    - levers ⊆ editable
@@ -364,10 +364,21 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 > $0.35 = $1.03 (local ledgers are per laptop). Without an LLM the loop runs its rules planner (not
 > smart), and the replays of live sessions still work.
 
-- **Models:** plan and analyze use **Sonnet 5.5**; prompt parsing uses **Haiku 5.5**.
-  - About 2 Sonnet calls per step, 8 steps → **about $0.40 per session**.
-  - Caps: $0.60 per session, $4.50 total (local ledger).
-  - Rehearse in replay. Ask the organizers about sponsor credits.
+> **Sat Oct 24 evening: the default LLM is now DeepSeek** (decided by W-C after the Anthropic budget
+> ran out). Claude stays a supported provider: `DARWIN_LLM_PROVIDER=anthropic` switches back, and
+> nothing else changes. The C5 bench (`demo/bench_wing.json`) and the recordings in `demo/` were made
+> with Claude (Sonnet 5.5 / Haiku 5.5) and say so; they are not re-run on DeepSeek.
+
+- **Provider:** set `DEEPSEEK_API_KEY` in `~/.darwin_secrets.sh` and DeepSeek is used automatically
+  (`backend/llm.py`; explicit `DARWIN_LLM_PROVIDER` wins).
+- **Models:** plan and analyze use the deep model **`deepseek-v4-pro`**; prompt parsing uses the fast
+  model **`deepseek-flash`**. `DARWIN_MODEL_DEEP=deepseek-flash` makes a session cheaper still.
+  On Claude the same roles are Sonnet 5.5 and Haiku 5.5.
+  - Expected cost: well under $0.10 per session on DeepSeek (measure one run before batches;
+    the ledger prices at peak rates, off-peak is half).
+  - Caps: $0.60 per session, `DARWIN_SPEND_CAP_TOTAL_USD` total, **one local ledger per provider**
+    (`.darwin/spend_deepseek.json`; the old Claude spend stays in `.darwin/spend.json`).
+  - Rehearse in replay.
 - **Onshape (prod):** a session costs about 2 calls per accepted step, plus 2 versions and
   2 reads, so about 20 calls. Simulations cost **zero** Onshape calls (analytic geometry).
   The 400-call reserve stays locked until the judging table (`DARWIN_ALLOW_RESERVE=1`).
@@ -536,7 +547,7 @@ The structural/FEA work is parked: leave the files, stop work.
 **Risks:**
 - *LLM proposes junk* → validated or replaced by the rules step.
 - *Explanations sound right but are wrong* → numbers only from the input; predictions scored.
-- *Cost* → Sonnet only for plan and analyze; cache and replay for rehearsal.
+- *Cost* → the deep model only for plan and analyze; cache and replay for rehearsal.
 
 ### W-D: Panel and story (`extension/`, `dashboard/`, `docs/`)
 
@@ -673,7 +684,7 @@ The numbers above are illustrative. **Say only the numbers from the actual run.*
 | # | Risk | Likelihood | Impact | Mitigation | Owner |
 |---|---|---|---|---|---|
 | 1 | Wing Part Studio takes too long | Medium | High | Fixed spline airfoil; cut line 1 (fin morphs instead) | W-A |
-| 2 | LLM steps are slow or expensive | Medium | Medium | Two Sonnet calls per step; cache; replay for rehearsal; rules fallback | W-C |
+| 2 | LLM steps are slow or expensive | Medium | Medium | Two deep-model calls per step (DeepSeek, cheap); cache; replay for rehearsal; rules fallback | W-C |
 | 3 | Explanations sound right but are wrong | Medium | High | Numbers only from inputs; predictions scored by code; principles cited | W-C |
 | 4 | The extension can't iframe localhost | Low | Medium | Native panel with direct fetch; cut line 3 | W-D |
 | 5 | Onshape writes fail mid-demo | Low | High | Version before writes; read-back verify; replay fallback; reserve unlocked at the table | W-A |

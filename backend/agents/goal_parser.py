@@ -1,4 +1,4 @@
-"""Goal parser: plain English -> typed Goal over catalog metrics only (1 Haiku call + retries)."""
+"""Goal parser: plain English -> typed Goal over catalog metrics only (1 fast-model call + retries)."""
 import re
 from typing import Any, Dict, List, Optional, Tuple
 

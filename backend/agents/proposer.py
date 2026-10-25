@@ -1,4 +1,4 @@
-"""Proposer: one Haiku call per generation -> N candidate designs with parents and rationale."""
+"""Proposer: one fast-model call per generation -> N candidate designs with parents and rationale."""
 from typing import Any, Dict, List, Optional, Tuple
 
 from shared.contracts import Directive, ModelResult, Proposal

@@ -8,7 +8,8 @@ Reported per goal (lead with prediction accuracy, per W-B's pilot): prediction a
 variants), final result of the best feasible design, simulations used, and simulations to reach
 95% of the best value known for that goal (best of every run plus a random landscape sample).
 
-Run: DARWIN_LLM_PROVIDER=anthropic python -m backend.bench_wing [--repeats 3] [--sims 20]
+Run (needs an LLM key): python -m backend.bench_wing [--repeats 3] [--sims 20]
+The committed demo/bench_wing.json was made with Claude Sonnet 5.5 (Sat Oct 24).
 """
 import argparse
 import json

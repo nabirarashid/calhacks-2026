@@ -1,6 +1,6 @@
 """Agent vs CMA-ES vs random on matched budgets (PLAN.md v3 MS-2). Writes demo/bench.json.
 
-Run: DARWIN_LLM_PROVIDER=anthropic python -m backend.bench [--seeds 3] [--out demo/bench.json]
+Run (needs an LLM key): python -m backend.bench [--seeds 3] [--out demo/bench.json]
 Never touches Onshape (DARWIN_CAD is forced off and the bench profile skips geometry).
 Goals are the presets (no goal-parser variance). For each goal the "oracle" is the best
 aggregate seen anywhere: a landscape sample plus every design any method evaluated.

@@ -189,9 +189,9 @@ McBeath *Competition Car Aerodynamics*, Hoerner, the NeuralFoil paper.
   layer matters, the agent without it needs more simulations. That's a slide.
 
 Model choice: the hypothesis and analysis steps are where intelligence matters, so they
-use the stronger model (Sonnet 5.5); parsing stays on Haiku. That's about 10–15 calls
-per run, roughly $0.40. With $4.35 of credit left, that's about 10 live runs. Use
-replay for rehearsals, and ask the organizers about sponsor credits.
+use the stronger model; parsing uses the fast one. (Update, Sat evening: the default
+provider is now DeepSeek, `deepseek-v4-pro` / `deepseek-flash`, after the Claude budget ran
+out; Claude is still supported. See PLAN.md B.9.) Use replay for rehearsals.
 
 ---
 
@@ -347,7 +347,7 @@ are exactly what the rear-wing solver and the knowledge layer need.
 |---|---|
 | API writes don't visibly update the open tab | Spike first. Fallback: show the configured-export STL morphing in the panel's 3D view, and write once at the end |
 | Airfoil shape is hard to parameterize in Onshape | Fixed airfoil profile; vary angle, span, chord, taper, flap angle, endplates |
-| Sonnet cost | About $0.40 per run; replay for rehearsals; ask for credits |
+| LLM cost | DeepSeek by default (cents per run); replay for rehearsals |
 | Agent explanations sound right but are wrong | Predictions are scored against the solver every step; numeric-claim check; principles cited |
 | Scope creep again | This document is the scope. Anything not in §8 waits until after 01:00 |
 

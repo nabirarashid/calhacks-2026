@@ -1,6 +1,6 @@
 """Env-driven choice of real vs fake components. The ONLY place backend picks implementations.
 
-DARWIN_SIM=real|fake   DARWIN_CAD=real|fake|off   DARWIN_LLM_PROVIDER=anthropic|mock|replay
+DARWIN_SIM=real|fake   DARWIN_CAD=real|fake|off   DARWIN_LLM_PROVIDER=deepseek|anthropic|mock|replay
 A "real" component that cannot be imported falls back to its fake, and /api/health says so.
 """
 import importlib

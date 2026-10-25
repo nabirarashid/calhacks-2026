@@ -386,7 +386,7 @@ class Investigator:
         try:
             res = llm.call_model("investigator_plan", system_prompt("investigator_plan", self.space),
                                  user_message("Propose the next experiment.", block), schema,
-                                 model=llm.deep_model() if llm.provider_name() == "anthropic" else None,
+                                 model=llm.deep_model_or_default(),
                                  max_tokens=1500, effort="medium", budget=self.llm_budget,
                                  validate=lambda d: out.update(r=self._validate_plan(d, step, sims_left)))
             return out["r"] if "r" in out else self._validate_plan(res.data, step, sims_left)
@@ -451,7 +451,7 @@ class Investigator:
                 res = llm.call_model("investigator_analyze", system_prompt("investigator_analyze", self.space),
                                      user_message("Explain this experiment.", block),
                                      investigator_analyze_schema(),
-                                     model=llm.deep_model() if llm.provider_name() == "anthropic" else None,
+                                     model=llm.deep_model_or_default(),
                                      max_tokens=600, budget=self.llm_budget)
                 expl, _ = scrub_claims(_clip(str(res.data.get("explanation", "")), 80), block)
                 lesson, _ = scrub_claims(_clip(str(res.data.get("lesson", "")), 30), block)

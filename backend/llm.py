@@ -1,13 +1,19 @@
 """call_model: THE one swappable LLM function (PLAN.md S3, B.7).
 
-Providers (env DARWIN_LLM_PROVIDER): anthropic | mock | replay. A new provider
-(sponsor credits etc.) is one more branch in _complete() and nothing else.
+Providers (env DARWIN_LLM_PROVIDER): deepseek | anthropic | mock | replay. Unset, it is
+deepseek when DEEPSEEK_API_KEY is set, else anthropic when ANTHROPIC_API_KEY is set, else mock.
+A new provider is one more branch in _complete() and nothing else.
 
-Guarantees: caps are checked before every attempt (per run + event total);
-max_tokens >= 1500; never sends temperature/top_p/top_k (400 since 2026-10-21);
-reads the first `text` block (Haiku 5.5 thinks first); checks stop_reason; JSON
-via structured output -> json.loads -> regex fallback -> validate -> up to 2
-retries with the validation error appended.
+Each real provider has a fast model (prompt parsing) and a deep model (plan, analyze, report):
+    deepseek   deepseek-flash     / deepseek-v4-pro      (OpenAI-format chat completions, JSON mode)
+    anthropic  claude-haiku-5-5   / claude-sonnet-5-5
+DARWIN_MODEL_FAST / DARWIN_MODEL_DEEP override them; an override naming another provider's model
+is ignored, so switching providers never sends a Claude model name to DeepSeek or back.
+
+Guarantees: caps are checked before every attempt (per run + event total, one ledger per
+provider); max_tokens >= 1500; never sends temperature/top_p/top_k; reads the final answer,
+not the reasoning; checks the stop/finish reason; JSON via structured output or JSON mode ->
+json.loads -> regex fallback -> validate -> up to 2 retries with the validation error appended.
 """
 import hashlib
 import json
@@ -21,11 +27,19 @@ from typing import Any, Callable, Dict, Optional, Tuple
 from shared.contracts import ModelResult
 
 # USD per million tokens (input, output), checked against the official table 2026-10-23.
+# DeepSeek: peak-hour cache-miss rates (off-peak is half), checked 2026-10-24, so the ledger over-counts.
 PRICES = {
     "claude-haiku-5-5": (0.10, 0.50),
     "claude-sonnet-5-5": (2.00, 10.00),
+    "deepseek-flash": (0.30, 1.20),
+    "deepseek-v4-pro": (1.32, 3.96),
     "mock": (0.0, 0.0),
 }
+MODELS = {  # provider -> (fast, deep)
+    "deepseek": ("deepseek-flash", "deepseek-v4-pro"),
+    "anthropic": ("claude-haiku-5-5", "claude-sonnet-5-5"),
+}
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 MIN_MAX_TOKENS = 1500
 MAX_ATTEMPTS = 3
 
@@ -39,16 +53,37 @@ class LLMUnavailable(Exception):
 
 
 def provider_name() -> str:
-    default = "anthropic" if os.environ.get("ANTHROPIC_API_KEY") else "mock"
-    return os.environ.get("DARWIN_LLM_PROVIDER", default)
+    if os.environ.get("DARWIN_LLM_PROVIDER"):
+        return os.environ["DARWIN_LLM_PROVIDER"]
+    if os.environ.get("DEEPSEEK_API_KEY"):
+        return "deepseek"
+    return "anthropic" if os.environ.get("ANTHROPIC_API_KEY") else "mock"
+
+
+def _family(model: str) -> Optional[str]:
+    return "anthropic" if model.startswith("claude-") else "deepseek" if model.startswith("deepseek-") else None
+
+
+def _model(env: str, tier: int) -> str:
+    provider = provider_name()
+    fast, deep = MODELS.get(provider, MODELS["anthropic"])     # mock/replay keep the Claude names (replay cache keys)
+    override = os.environ.get(env, "")
+    if override and (provider not in MODELS or _family(override) in (None, provider)):
+        return override
+    return (fast, deep)[tier]
 
 
 def fast_model() -> str:
-    return os.environ.get("DARWIN_MODEL_FAST", "claude-haiku-5-5")
+    return _model("DARWIN_MODEL_FAST", 0)
 
 
 def deep_model() -> str:
-    return os.environ.get("DARWIN_MODEL_DEEP", "claude-sonnet-5-5")
+    return _model("DARWIN_MODEL_DEEP", 1)
+
+
+def deep_model_or_default() -> Optional[str]:
+    """The deep model on a real provider; None (the call's default) on mock and replay."""
+    return deep_model() if provider_name() in MODELS else None
 
 
 def _state_dir() -> Path:
@@ -83,13 +118,15 @@ class RunLLMBudget:
 
 
 class SpendLedger:
-    """Event-wide local spend ledger (.darwin/spend.json). The Anthropic Console is ground truth."""
+    """Event-wide local spend ledger, one per provider (.darwin/spend.json for anthropic,
+    .darwin/spend_<provider>.json otherwise). The provider's console is ground truth."""
 
     _lock = threading.Lock()
 
     @staticmethod
     def path() -> Path:
-        return _state_dir() / "spend.json"
+        provider = provider_name()
+        return _state_dir() / ("spend.json" if provider == "anthropic" else "spend_%s.json" % provider)
 
     @classmethod
     def read(cls) -> Dict[str, float]:
@@ -169,6 +206,57 @@ def _anthropic_client(timeout_s: float):
     return _client
 
 
+def _deepseek(system: str, user: str, schema: Optional[dict], model: str, max_tokens: int, effort: str,
+              timeout_s: float, think: bool) -> Tuple[str, int, int]:
+    """DeepSeek chat completions (OpenAI format) over httpx; no extra SDK."""
+    import httpx
+    key = os.environ.get("DEEPSEEK_API_KEY")
+    if not key:
+        raise LLMUnavailable("DEEPSEEK_API_KEY is not set")
+    if schema is not None:   # JSON mode needs the word "json" and the expected shape in the prompt
+        system = "%s\n\nReply with ONLY one json object that matches this JSON schema:\n%s" % (
+            system, json.dumps(schema, separators=(",", ":")))
+    body = {"model": model, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            # DeepSeek has none/low/high/max; our "medium" goes to low to stay inside the 40 s timeout
+            "reasoning_effort": {"high": "high", "max": "max"}.get(effort, "low") if think else "none",
+            # reasoning counts toward max_tokens; unused headroom costs nothing
+            "max_tokens": max(max_tokens, MIN_MAX_TOKENS) + (16000 if think else 0)}  # type: Dict[str, Any]
+    if schema is not None:
+        body["response_format"] = {"type": "json_object"}
+    url = os.environ.get("DEEPSEEK_BASE_URL", DEEPSEEK_BASE_URL).rstrip("/") + "/chat/completions"
+    resp = None
+    for attempt in (0, 1):                      # one retry on rate limit, overload, or a dropped connection
+        try:
+            resp = httpx.post(url, json=body, timeout=timeout_s,
+                              headers={"Authorization": "Bearer %s" % key, "Content-Type": "application/json"})
+        except httpx.TransportError as e:        # includes timeouts
+            if attempt:
+                raise LLMUnavailable("deepseek: %s" % type(e).__name__)
+            continue
+        if resp.status_code in (429, 500, 502, 503) and not attempt:
+            time.sleep(1.0)
+            continue
+        break
+    if resp.status_code >= 400:
+        try:
+            detail = str(resp.json().get("error", {}).get("message", ""))[:160]
+        except ValueError:
+            detail = ""
+        raise LLMUnavailable("deepseek: HTTP %d %s" % (resp.status_code, detail))
+    data = resp.json()
+    usage = data.get("usage") or {}
+    tokens_in, tokens_out = int(usage.get("prompt_tokens", 0)), int(usage.get("completion_tokens", 0))
+    choice = (data.get("choices") or [{}])[0]
+    finish = choice.get("finish_reason")
+    if finish == "content_filter":
+        raise LLMUnavailable("refusal")
+    if finish == "length":
+        raise LLMUnavailable("max_tokens")
+    if finish not in (None, "stop"):
+        raise LLMUnavailable("deepseek: finish_reason %s" % finish)
+    return (choice.get("message") or {}).get("content") or "", tokens_in, tokens_out
+
+
 def _complete(provider: str, role: str, system: str, user: str, schema: Optional[dict], model: str,
               max_tokens: int, effort: str, timeout_s: float, think: bool = True) -> Tuple[str, int, int]:
     """One raw completion. Returns (text, tokens_in, tokens_out). Raises LLMUnavailable."""
@@ -200,6 +288,8 @@ def _complete(provider: str, role: str, system: str, user: str, schema: Optional
             raise LLMUnavailable("max_tokens")
         text = next((b.text for b in resp.content if getattr(b, "type", None) == "text"), "")
         return text, tokens_in, tokens_out
+    if provider == "deepseek":
+        return _deepseek(system, user, schema, model, max_tokens, effort, timeout_s, think)
     raise LLMUnavailable("unknown provider %r" % provider)
 
 
@@ -212,7 +302,7 @@ def call_model(role: str, system: str, user: str, schema: Optional[dict] = None,
     """Call the configured provider and return validated JSON in ModelResult.data.
 
     `validate(data)` may raise to reject the output (it is retried with the error
-    appended). `think=False` turns Haiku thinking off (latency; critical-path roles),
+    appended). `think=False` turns fast-model thinking off (latency; critical-path roles),
     unless DARWIN_FAST_THINKING=1. Raises BudgetExceeded or LLMUnavailable.
     """
     provider = provider_name()

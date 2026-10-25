@@ -1,4 +1,4 @@
-"""Reporter: the critic in Sonnet mode, once per run, for the winner card / engineering report."""
+"""Reporter: the critic on the deep model, once per run, for the winner card / engineering report."""
 from typing import Any, Dict, Optional, Tuple
 
 from shared.contracts import DesignResult, ModelResult, Score
@@ -27,7 +27,7 @@ def report(history: RunHistory, hifi: Optional[Score], baselines: Dict[str, Desi
                 "narrative": critic_why, "caveats": ["Fast semi-empirical physics; verify before flight."]}
     try:
         res = llm.call_model("reporter", system_prompt("reporter", history.space), user_message("Write the report summary.", block),
-                             report_schema(), model=llm.deep_model() if llm.provider_name() == "anthropic" else None,
+                             report_schema(), model=llm.deep_model_or_default(),
                              max_tokens=2500, effort="medium", budget=budget, validate=lambda d: d["narrative"])
     except (llm.LLMUnavailable, llm.BudgetExceeded):
         return fallback, None
