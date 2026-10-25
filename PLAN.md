@@ -405,12 +405,29 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 
 ## Part C: The four sections
 
-**Progress (Sat 18:55):** done: A1, A3, A4 (on the disposable copy), B1–B5, C1–C5, D1–D3. **The LLM now goes
-through OpenRouter** (any model, chosen by env; B.9). **The fin demo works end to end on the trapezoid
-copy:** prompt in the panel → DeepSeek/Claude plans with fin principles → every accepted step morphs
-all five fin dimensions live in Onshape → versions before/after (live 18:34: drag −12% in 46 s;
-18:43: mass −28% in 52 s). Waiting on: the wing Part Studio URL from W-A (A2, reported done) to
-run A5/A6 on the wing; C6 recordings; D4–D6.
+**Progress (Sat 19:15) — THE DEMO IS THE WING** (document "calhacks2", Part Studio `rear_wing`; the
+trapezoid/fin is retired). Done: A1, A3, A4 (retired), B1–B5, C1–C5, D1–D3.
+- **Wing is connected and morphs live** (W-C, 19:10): the server reads its six Variables and writes them
+  in ~1.2 s per step, verified by read-back. Bounding-box checks: `aoa_deg` 6→12° (height 46→63 mm),
+  `span_mm` 850→950, `flap_angle_deg` 10→25°, `flap_chord_frac` all regenerate.
+- **W-A must fix two things in the Part Studio (A2):**
+  1. `chord_mm` drives nothing: at 330 mm the airfoil is still 280 mm (main 196 + flap 91 mm). The
+     airfoil scale must reference `#chord_mm` (main `(1 - #flap_chord_frac) * #chord_mm`, flap
+     `#flap_chord_frac * #chord_mm`).
+  2. The endplates (Parts 3 and 4) are empty bodies (zero bounding box), so `endplate_height_mm`
+     shows nothing. They need real solids of height `#endplate_height_mm`.
+  Until then, demo prompts should only allow angle of attack, span and flap (B.5 still simulates all six).
+- **Onshape quota (blocker found 18:43):** `GET /features` has its own small daily quota, exhausted until
+  ~Sun 14:45 (`Retry-After` ~71,000 s). Other endpoints are fine (writes 3,000, Variables 3,000, boxes
+  2,998, rollback ~80, versions OK). W-C added an "adopted Variables" path (`cad/variables.py`): six
+  `Darwin: <name>` Variable features sit right after the original six and are written by feature id,
+  so the demo never reads the feature list. Don't delete the `Darwin:` features. The original six
+  can be deleted (cosmetic).
+- **LLM:** OpenRouter, Haiku 5.5 for every role (B.9). Waiting for `OPENROUTER_API_KEY` to run A5 (a full
+  live wing session) with Haiku.
+- **Open:** A2 fixes (W-A), A5/A6, C6 recordings, D4–D6; extension (D1) not yet tried in real Chrome.
+
+*Earlier (Sat 18:55): the fin worked end to end on the trapezoid copy (now retired).*
 
 *Earlier (Sat 16:55):* done: A1, A3, B1–B5, C1–C5, D1, D2. In progress: A2 (wing Part Studio, W-A's build guide is in `cad/WING_PARTSTUDIO.md`). The Anthropic API works again (16:28, Hannah's own $5). The investigator runs end to end on the
 real rear-wing solver (CP-C's terminal criterion is met). **Not yet visible in git:** anything from
