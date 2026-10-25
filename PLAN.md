@@ -371,8 +371,8 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 
 - **Provider (Sat 18:55): OpenRouter**, so the team can switch models any time. Set
   `OPENROUTER_API_KEY` in `~/.darwin_secrets.sh` and it is used automatically (it wins over DeepSeek
-  and Anthropic keys; explicit `DARWIN_LLM_PROVIDER` wins over all). Defaults: deep
-  `anthropic/claude-sonnet-5.5`, fast `anthropic/claude-haiku-5.5` (the C5 setup, ~$0.21/session).
+  and Anthropic keys; explicit `DARWIN_LLM_PROVIDER` wins over all). Default: **`anthropic/claude-haiku-5.5` for every
+  role** (team decision Sat 19:00; no Sonnet).
   Any id from openrouter.ai/models works: `DARWIN_MODEL_DEEP=google/gemini-3.8-flash`, etc.
   OpenRouter reports each call's real cost; the ledger is `.darwin/spend_openrouter.json`.
   DeepSeek direct (below) stays supported but was too slow for the demo.

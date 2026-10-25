@@ -5,7 +5,7 @@ first whose key is set wins: OPENROUTER_API_KEY, DEEPSEEK_API_KEY, ANTHROPIC_API
 A new provider is one more branch in _complete() and nothing else.
 
 Each real provider has a fast model (prompt parsing) and a deep model (plan, analyze, report):
-    openrouter  anthropic/claude-haiku-5.5 / anthropic/claude-sonnet-5.5   (any OpenRouter model id works)
+    openrouter  anthropic/claude-haiku-5.5 for both (team decision Sat 19:00; any OpenRouter model id works)
     deepseek    deepseek-flash             / deepseek-v4-pro
     anthropic   claude-haiku-5-5           / claude-sonnet-5-5
 DARWIN_MODEL_FAST / DARWIN_MODEL_DEEP override them (on OpenRouter: any "vendor/model" id from
@@ -38,7 +38,7 @@ PRICES = {
     "mock": (0.0, 0.0),
 }  # OpenRouter reports each call's actual cost, so its models need no row here
 MODELS = {  # provider -> (fast, deep)
-    "openrouter": ("anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5"),
+    "openrouter": ("anthropic/claude-haiku-5.5", "anthropic/claude-haiku-5.5"),
     "deepseek": ("deepseek-flash", "deepseek-v4-pro"),
     "anthropic": ("claude-haiku-5-5", "claude-sonnet-5-5"),
 }

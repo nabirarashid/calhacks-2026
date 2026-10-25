@@ -72,6 +72,7 @@ class Resp:
 def cad(monkeypatch, tmp_path):
     from cad import api, cache
     monkeypatch.chdir(tmp_path)                        # cache.store writes .darwin/geometry relative to cwd
+    monkeypatch.setenv("DARWIN_CACHE_DIR", str(tmp_path / ".darwin"))   # no adopted ids from other tests
     monkeypatch.setenv("DARWIN_DOC_WING", URL)
     monkeypatch.setenv("DARWIN_ONSHAPE_WRITE_DOCS", "DARWIN_DOC_FIN,DARWIN_DOC_WING")
     led = FakeLedger()
@@ -232,3 +233,68 @@ def test_stl_401_keeps_the_write_and_stops_retrying_the_export(cad, monkeypatch)
     second = variables.apply_values(URL, {"aoa_deg": 9.0}, UNITS)
     assert first.status == second.status == "ready" and "stl_export" in second.error
     assert len(exports) == 1 and _expr(cad, "aoa_deg") == "9 deg"
+
+
+class AdoptedClient:
+    """Feature writes, Variables API and bounding boxes only; GET /features always fails (its quota is gone)."""
+
+    def __init__(self, ledger, regen="OK"):
+        self.ledger, self.regen = ledger, regen
+        self.vars = {"aoa_deg": "6 deg", "span_mm": "850 mm", "flap_chord_frac": "0.3"}
+        self.posts = []
+
+    def get_features(self, *a, **k):
+        from cad.onshape_client import OnshapeError
+        raise OnshapeError("GET features -> HTTP 429", 429)
+
+    def request(self, method, path, purpose, **kw):
+        self.ledger.n += 1
+        if path.endswith("/variables"):
+            return Resp([{"variables": [{"name": n, "expression": e, "type": "X"} for n, e in self.vars.items()]}])
+        if path.endswith("/currentmicroversion"):
+            return Resp({"microversion": "mv0"})
+        if path.endswith("/boundingboxes"):
+            return Resp({"lowX": 0, "lowY": 0, "lowZ": 0, "highX": 0.28, "highY": 0.85, "highZ": 0.05})
+        if path.endswith("/rollback"):
+            return Resp({"rollbackIndex": kw["json_body"]["rollbackIndex"]})
+        feature = kw["json_body"]["feature"]
+        self.posts.append((path, feature))
+        if self.regen == "OK":
+            p = {q["parameterId"]: q for q in feature["parameters"]}
+            self.vars[p["name"]["value"]] = next(q["expression"] for q in feature["parameters"] if "expression" in q)
+        return Resp({"featureState": {"featureStatus": self.regen}, "sourceMicroversion": "mv1",
+                     "feature": dict(feature, featureId=feature.get("featureId") or "Fnew%d" % len(self.posts))})
+
+
+@pytest.fixture
+def adopted(monkeypatch, tmp_path):
+    from cad import api
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("DARWIN_DOC_WING", URL)
+    monkeypatch.setenv("DARWIN_ONSHAPE_WRITE_DOCS", "DARWIN_DOC_WING")
+    monkeypatch.setenv("DARWIN_CACHE_DIR", str(tmp_path / ".darwin"))
+    led = FakeLedger()
+    client = AdoptedClient(led)
+    monkeypatch.setattr(api, "_get_ledger", lambda: led)
+    monkeypatch.setattr(api, "_get_client", lambda: client)
+    monkeypatch.setattr(variables, "RATE_LIMIT_WAITS_S", (0.0, 0.0))
+    return client
+
+
+def test_adopt_then_write_by_id_without_reading_the_feature_list(adopted):
+    ids = variables.adopt_variables(URL, [("aoa_deg", "deg", 6.0), ("span_mm", "mm", 850.0)], after_index=6)
+    assert set(ids) == {"aoa_deg", "span_mm"}
+    assert [p for p, _ in adopted.posts[:1]][0].endswith("/features")                      # created, ids kept
+    assert all(f["name"].startswith("Darwin: ") for _, f in adopted.posts)
+    adopted.posts.clear()
+    ref = variables.apply_values(URL, {"aoa_deg": 9.0, "span_mm": 850.0}, {"aoa_deg": "deg", "span_mm": "mm"})
+    assert ref.status == "ready" and ref.regen_status == "OK" and ref.bbox_mm == [0, 0, 0, 280.0, 850.0, 50.0]
+    assert len(adopted.posts) == 1 and adopted.posts[0][0].endswith("/featureid/" + ids["aoa_deg"])   # span unchanged
+    assert adopted.vars["aoa_deg"] == "9 deg" and variables.list_variables(URL)["aoa_deg"]["value"] == 9.0
+
+
+def test_adopted_regen_failure_reverts(adopted):
+    variables.adopt_variables(URL, [("aoa_deg", "deg", 6.0)], after_index=6)
+    adopted.regen = "ERROR"
+    ref = variables.apply_values(URL, {"aoa_deg": 40.0}, {"aoa_deg": "deg"})
+    assert ref.status == "failed" and "reverted" in ref.error and len(adopted.posts) == 3      # add, write, revert

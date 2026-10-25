@@ -141,7 +141,7 @@ def test_openrouter_wins_and_any_model_id_works(monkeypatch):
     monkeypatch.setenv("DEEPSEEK_API_KEY", "y")
     monkeypatch.setenv("OPENROUTER_API_KEY", "z")
     assert (llm.provider_name(), llm.fast_model(), llm.deep_model()) == \
-        ("openrouter", "anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5")
+        ("openrouter", "anthropic/claude-haiku-5.5", "anthropic/claude-haiku-5.5")     # Haiku for everything
     monkeypatch.setenv("DARWIN_MODEL_DEEP", "google/gemini-3.8-flash")    # pick any model, any time
     monkeypatch.setenv("DARWIN_MODEL_FAST", "deepseek-flash")             # another provider's name: ignored
     assert (llm.fast_model(), llm.deep_model()) == ("anthropic/claude-haiku-5.5", "google/gemini-3.8-flash")
@@ -156,7 +156,7 @@ def test_openrouter_request_and_reported_cost(openrouter):
     assert r.data == {"a": 1} and r.provider == "openrouter" and r.cost_usd == pytest.approx(0.0123)
     body = sent[0]["body"]
     assert sent[0]["url"] == "https://openrouter.ai/api/v1/chat/completions"
-    assert sent[0]["headers"]["Authorization"] == "Bearer or-key" and body["model"] == "anthropic/claude-sonnet-5.5"
+    assert sent[0]["headers"]["Authorization"] == "Bearer or-key" and body["model"] == "anthropic/claude-haiku-5.5"
     assert body["reasoning"] == {"effort": "medium", "exclude": True} and body["usage"] == {"include": True}
     assert body["response_format"] == {"type": "json_object"} and "reasoning_effort" not in body
     llm.call_model("parse", "s", "u", {"type": "object"}, think=False)
