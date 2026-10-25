@@ -17,7 +17,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from shared.contracts import DesignSpace, GeometryRef, ParamValue
+from shared.contracts import DesignSpace, Goal, GeometryRef, Objective, ParamValue
 from shared.manifest import ProjectManifest
 
 from backend import llm
@@ -67,7 +67,7 @@ def make_router(W: Any, BUS: Any, RUNS: Dict[str, Any], is_busy: Callable[[], bo
             found = W.cad.list_variables(doc_url)
         except Exception as e:  # noqa: BLE001 — inspection must not fail the panel
             log.warning("list_variables failed: %s", e)
-            return values, "defaults"
+            return values, "unreadable"
         hits = 0
         for p in space.parameters:
             v = (found.get(p.name) or {}).get("value")
@@ -75,6 +75,16 @@ def make_router(W: Any, BUS: Any, RUNS: Dict[str, Any], is_busy: Callable[[], bo
                 values[p.name] = v
                 hits += 1
         return values, "onshape" if hits else "defaults"
+
+    def current_metrics(space: DesignSpace, values: Dict[str, ParamValue], catalog: List[Any]) -> Optional[Dict[str, float]]:
+        """The design's metrics now (one fast simulation), so the parser can read "25% lighter"."""
+        try:
+            probe = Goal(source_text="", objectives=[Objective(
+                metric=next(m.name for m in catalog if m.better != "info"), direction="minimize")])
+            return dict(W.sim.evaluate(space, values, probe).metrics)
+        except Exception as e:  # noqa: BLE001 — without it, relative requests are refused, not misread
+            log.warning("current metrics unavailable: %s", e)
+            return None
 
     @router.post("/api/inspect")
     def inspect(body: InspectBody) -> Dict[str, Any]:
@@ -97,16 +107,21 @@ def make_router(W: Any, BUS: Any, RUNS: Dict[str, Any], is_busy: Callable[[], bo
         if "optimize" not in m.authority.permitted:
             raise HTTPException(409, "project %s is level %d (optimize not permitted)"
                                 % (m.project_id, m.authority.maturity))
+        values, source = live_values(body.doc_url, space)
+        writes = W.modes.get("cad") not in ("off",)
+        if writes and source == "unreadable":     # never morph a part from values we didn't read
+            raise HTTPException(503, "Couldn't read the part from Onshape (rate limit or network); try again in a moment")
+        catalog = W.catalog(space.scorer)
         try:
-            goal, _ = goal_parser.parse_goal(prompt, space, W.catalog(space.scorer), W.presets)
+            goal, _ = goal_parser.parse_goal(prompt, space, catalog, W.presets,
+                                             current=current_metrics(space, values, catalog), current_params=values)
         except goal_parser.UnsupportedGoal as e:
             raise HTTPException(422, {"message": str(e), "unsupported": e.unsupported, "measurable": e.measurable})
         except llm.LLMUnavailable as e:
             raise HTTPException(503, str(e))
         except ValueError as e:
             raise HTTPException(422, str(e))
-        values, source = live_values(body.doc_url, space)
-        units = {p.name: p.unit for p in space.parameters}
+        units = {p.name: p.unit for p in space.parameters if p.cad_driven}    # sim-only params never go to Onshape
         doc_url = body.doc_url
 
         def apply(sp: DesignSpace, params: Dict[str, ParamValue]) -> GeometryRef:
@@ -116,7 +131,6 @@ def make_router(W: Any, BUS: Any, RUNS: Dict[str, Any], is_busy: Callable[[], bo
                 values.update(changed)
             return ref
 
-        writes = W.modes.get("cad") not in ("off",)
         run_id = new_run_id("session")
         inv = Investigator(W, BUS.open(run_id), space, goal, max_steps=max(1, min(body.max_steps, 12)),
                            max_sims=max(2, min(body.max_sims, 40)), start=values,

@@ -78,6 +78,8 @@ def cad(monkeypatch, tmp_path):
     client = FakeClient(led)
     monkeypatch.setattr(api, "_get_ledger", lambda: led)
     monkeypatch.setattr(api, "_get_client", lambda: client)
+    monkeypatch.setattr(variables, "_stl_refused", False)
+    monkeypatch.setattr(variables, "RATE_LIMIT_WAITS_S", (0.0, 0.0))
     return client
 
 
@@ -203,3 +205,30 @@ def test_ensure_variables_creates_only_missing_ones_at_the_top(cad, monkeypatch)
     assert v["gurney_mm"]["expression"] == "5 mm" and v["gurney_mm"]["type"] == "LENGTH"
     assert v["gap_frac"]["expression"] == "0.02" and v["gap_frac"]["type"] == "NUMBER"
     assert variables.ensure_variables(URL, [("aoa_deg", "deg", 6)]) == []
+
+
+def test_rate_limit_is_retried(cad, monkeypatch):
+    from cad.onshape_client import OnshapeError
+    real, hits = cad.get_features, []
+
+    def flaky(*a, **k):
+        hits.append(1)
+        if len(hits) == 1:
+            raise OnshapeError("GET features -> HTTP 429", 429)
+        return real(*a, **k)
+    monkeypatch.setattr(cad, "get_features", flaky)
+    assert variables.apply_values(URL, {"aoa_deg": 8.0}, UNITS).status == "ready" and _expr(cad, "aoa_deg") == "8 deg"
+
+
+def test_stl_401_keeps_the_write_and_stops_retrying_the_export(cad, monkeypatch):
+    from cad.onshape_client import OnshapeError
+    exports = []
+
+    def refused(*a, **k):
+        exports.append(1)
+        raise OnshapeError("GET stl -> HTTP 401", 401)
+    monkeypatch.setattr(cad, "export_stl", refused)
+    first = variables.apply_values(URL, {"aoa_deg": 8.0}, UNITS)
+    second = variables.apply_values(URL, {"aoa_deg": 9.0}, UNITS)
+    assert first.status == second.status == "ready" and "stl_export" in second.error
+    assert len(exports) == 1 and _expr(cad, "aoa_deg") == "9 deg"

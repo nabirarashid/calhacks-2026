@@ -1,6 +1,7 @@
 """rocket_fin domain pack (PLAN.md v3 P1-B3). Owner: W-B. Minimal version written by W-C for Phase 1."""
+import os
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 from shared.manifest import BlockingQuestion, CadInventory, SourceRef
 
@@ -44,6 +45,15 @@ class RocketFinPack:
         "thickness": ["thickness"], "fin count": ["fin_count"], "number of fins": ["fin_count"],
         "edge": ["edge_profile"],
     }
+
+    def principles(self) -> List[Dict[str, str]]:
+        """The fin's knowledge layer: the P-FIN-* blocks of the shared aero file plus dynamic-pressure
+        scaling (the wing-only ones would mislead the planner). DARWIN_KNOWLEDGE=off removes it."""
+        if os.environ.get("DARWIN_KNOWLEDGE", "on").lower() == "off":
+            return []
+        from domains.aero.pack import _HERE as AERO, parse_principles
+        return [p for p in parse_principles((AERO / "principles.md").read_text())
+                if p["id"].startswith("P-FIN-") or p["id"] == "P-Q-SCALING"]
 
     def signature_match(self, inv: CadInventory) -> float:
         names = {c.id.lower() for c in inv.config_inputs} | {c.name.lower() for c in inv.config_inputs}

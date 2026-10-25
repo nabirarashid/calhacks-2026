@@ -183,3 +183,11 @@ def test_baselines_search_only_editable_params():
     for method in ("cmaes", "random"):
         RUNNERS[method](sub, sub_goal, sub_eval, 8, 1, "t", 4, default)
     assert seen and all(p["span_mm"] == start["span_mm"] and p["chord_mm"] == start["chord_mm"] for p in seen)
+
+
+def test_fin_pack_feeds_fin_principles_to_the_planner(monkeypatch):
+    from domains.rocket_fin.pack import PACK
+    ids = [p["id"] for p in PACK.principles()]
+    assert "P-FIN-SWEEP-OPTIMUM" in ids and "P-Q-SCALING" in ids and not any("FLAP" in i for i in ids)
+    monkeypatch.setenv("DARWIN_KNOWLEDGE", "off")
+    assert PACK.principles() == []

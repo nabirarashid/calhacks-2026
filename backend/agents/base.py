@@ -127,14 +127,15 @@ def _numbers(obj: Any, out: List[float]) -> None:
             _numbers(v, out)
 
 
-def unverified_numbers(text: str, source: Any, rel_tol: float = 0.02) -> List[str]:
-    """Numbers in `text` that match no number in `source` within 2 % (small integers allowed)."""
+def unverified_numbers(text: str, source: Any, rel_tol: float = 0.02, small_ints_ok: bool = True) -> List[str]:
+    """Numbers in `text` that match no number in `source` within 2 % (small integers allowed unless
+    small_ints_ok=False, which pins need: "3 fins" must be in the user's words)."""
     known = []  # type: List[float]
     _numbers(source, known)
     bad = []
     for tok in _NUM.findall(text):
         x = float(tok)
-        if x.is_integer() and abs(x) <= 10:
+        if small_ints_ok and x.is_integer() and abs(x) <= 10:
             continue
         # Sign-insensitive: prose says "fell 22.3%" for a change of -22.3.
         if not any(abs(abs(x) - abs(k)) <= rel_tol * max(abs(k), 1e-9) or abs(abs(x) - abs(k)) < 1e-6

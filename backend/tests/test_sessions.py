@@ -75,6 +75,21 @@ def test_session_parses_runs_morphs_and_versions(client):
                                                        and e["payload"]["verdict"] != "accepted"])
 
 
+def test_fin_session_writes_only_cad_driven_params(client, monkeypatch):
+    fin_url = URL.replace("0123456789ab", "f1f1f1f1f1f1") + "?fin"
+    monkeypatch.setenv("DARWIN_DOC_FIN", fin_url)
+    fake = client.state["fake_cad"]
+    sent = []
+    real_apply = fake.apply_values
+    monkeypatch.setattr(fake, "apply_values", lambda d, p, u: sent.append((dict(p), dict(u))) or real_apply(d, p, u))
+    prompt = "Minimize drag. You can change the root chord, sweep, fin count and thickness."
+    r = client.post("/api/sessions", json={"doc_url": fin_url, "prompt": prompt, "max_sims": 10, "max_steps": 4})
+    assert r.status_code == 200, r.text
+    assert r.json()["project_id"] == "fin_reference"
+    _wait(client, r.json()["run_id"])
+    assert sent and all("fin_count" not in p and "fin_count" not in u and "edge_profile" not in u for p, u in sent)
+
+
 def test_one_session_at_a_time_and_stop(client):
     r1 = client.post("/api/sessions", json={"doc_url": URL, "prompt": PROMPT, "max_sims": 40, "max_steps": 12}).json()
     r2 = client.post("/api/sessions", json={"doc_url": URL, "prompt": PROMPT})
@@ -88,3 +103,14 @@ def test_one_session_at_a_time_and_stop(client):
 def test_bad_requests(client):
     assert client.post("/api/sessions", json={"doc_url": URL, "prompt": "  "}).status_code == 422
     assert client.post("/api/sessions", json={"doc_url": "https://example.com", "prompt": "x"}).status_code == 404
+
+
+def test_session_refuses_to_write_when_onshape_cannot_be_read(client, monkeypatch):
+    fake = client.state["fake_cad"]
+
+    def down(url):
+        raise RuntimeError("HTTP 429")
+    monkeypatch.setattr(fake, "list_variables", down)
+    r = client.post("/api/sessions", json={"doc_url": URL, "prompt": PROMPT})
+    assert r.status_code == 503 and "Onshape" in r.json()["detail"]
+    assert client.post("/api/inspect", json={"doc_url": URL}).json()["source"] == "unreadable"

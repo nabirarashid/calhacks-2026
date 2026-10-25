@@ -26,6 +26,20 @@ from shared.contracts import GeometryRef, ParamValue
 from cad import cache, stl
 from cad.onshape_client import OnshapeError, parse_doc_url
 
+RATE_LIMIT_WAITS_S = (1.5, 3.0)   # Onshape's short-term limiter (HTTP 429, Sat 18:43): wait and retry twice
+_stl_refused = False              # the STL download 401s on a cross-host redirect; stop paying 2 calls per step
+
+
+def _retry(fn: Any, *args: Any, **kwargs: Any) -> Any:
+    """Call fn, retrying only on HTTP 429."""
+    for wait in RATE_LIMIT_WAITS_S + (None,):
+        try:
+            return fn(*args, **kwargs)
+        except OnshapeError as e:
+            if e.status != 429 or wait is None:
+                raise
+            time.sleep(wait)
+
 VALUE_PARAM = {"LENGTH": "lengthValue", "ANGLE": "angleValue", "NUMBER": "numberValue", "ANY": "anyValue"}
 _LITERAL = re.compile(r"^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\s*([A-Za-z]*)\s*$")
 _UNIT = {"mm": "mm", "millimeter": "mm", "deg": "deg", "degree": "deg", "": ""}
@@ -173,7 +187,7 @@ def list_variables(doc_url: str) -> Dict[str, Dict[str, Any]]:
     """Live Variable values for the panel's change/keep list. 1 call. Raises OnshapeError on HTTP failure."""
     c = _api()._get_client()
     did, wid, eid = resolve_doc(doc_url, c)
-    return parse_variables(c.get_features(did, wid, eid, purpose="inspect"))
+    return parse_variables(_retry(c.get_features, did, wid, eid, purpose="inspect"))
 
 
 # ---------------------------------------------------------------- writing
@@ -227,7 +241,7 @@ def apply_values(doc_url: str, params: Mapping[str, ParamValue], units: Mapping[
     try:
         c = api._get_client()
         did, wid, eid = resolve_doc(doc_url, c)
-        features = c.get_features(did, wid, eid, purpose="apply")
+        features = _retry(c.get_features, did, wid, eid, purpose="apply")
         variables = parse_variables(features)
         missing = sorted(n for n in params if n not in variables)
         if missing:
@@ -245,8 +259,8 @@ def apply_values(doc_url: str, params: Mapping[str, ParamValue], units: Mapping[
         source_mv = features["sourceMicroversion"]
         for name, var, expression in changes:
             feature = by_id[var["feature_id"]]
-            resp = _post_feature(c, did, wid, eid, features, _with_expression(feature, var["value_param"], expression),
-                                 source_mv)
+            resp = _retry(_post_feature, c, did, wid, eid, features,
+                          _with_expression(feature, var["value_param"], expression), source_mv)
             source_mv = resp.get("sourceMicroversion") or source_mv
             status = ((resp.get("featureState") or {}).get("featureStatus") or "OK").upper()
             if status != "OK":
@@ -255,13 +269,17 @@ def apply_values(doc_url: str, params: Mapping[str, ParamValue], units: Mapping[
                     status, name, expression, ((revert.get("featureState") or {}).get("featureStatus") or "?")),
                     calls(), started)
         if changes:
-            after = parse_variables(c.get_features(did, wid, eid, purpose="apply_verify"))
+            after = parse_variables(_retry(c.get_features, did, wid, eid, purpose="apply_verify"))
             wrong = [n for n, _, e in changes if after.get(n, {}).get("expression") != e]
             if wrong:
                 return _fail(key, "read-back mismatch for %s" % ", ".join(wrong), calls(), started)
+        global _stl_refused
         try:
+            if _stl_refused:
+                raise OnshapeError("skipped after an earlier 401", 401)
             text = c.export_stl(did, wid, eid, purpose="apply_verify")
         except OnshapeError as e:            # the variables are written and verified; the STL is only evidence
+            _stl_refused = _stl_refused or e.status in (401, 403)
             return GeometryRef(geometry_key=key, status="ready", source="onshape_feature",
                                error="stl_export: %s" % str(e)[:200], onshape_calls=calls(), regen_status="OK",
                                elapsed_ms=(time.time() - started) * 1000.0)
@@ -320,7 +338,7 @@ def create_version(doc_url: str, name: str) -> Optional[str]:
     try:
         c = _api()._get_client()
         did, wid, _ = resolve_doc(doc_url, c)
-        return c.create_version(did, wid, name, purpose="version").get("id")
+        return _retry(c.create_version, did, wid, name, purpose="version").get("id")
     except (OnshapeError, ValueError) as e:
         import logging
         logging.getLogger("darwin.cad").warning("create_version failed: %s", e)

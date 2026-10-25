@@ -38,6 +38,8 @@ _ALLOW = re.compile(r"\b(?:(?:you\s+)?(?:can|may|could|are\s+allowed\s+to|feel\s
                     r"vary|modify|tweak|touch))\b([^.;!?]*)", re.I)
 _KEEP = re.compile(r"\b(?:keep|leave|hold|fix|freeze|don'?t\s+(?:change|touch|move)|do\s+not\s+(?:change|touch|move)|"
                    r"without\s+changing|must\s+not\s+change)\b([^.;!?]*)", re.I)
+_EXCEPT = re.compile(r"\b(?:except(?:\s+for)?|but\s+not|other\s+than|apart\s+from|besides|aside\s+from|excluding)\b",
+                     re.I)
 
 
 def _aliases(space: DesignSpace) -> List[Tuple[str, List[str]]]:
@@ -64,8 +66,11 @@ def _params_in(span: str, aliases: List[Tuple[str, List[str]]]) -> List[str]:
 def infer_editable(text: str, space: DesignSpace) -> Tuple[List[str], List[str]]:
     """Deterministic reading of "you can change X, Y" and "keep Z" -> (allowed, kept)."""
     aliases = _aliases(space)
-    allowed = [p for m in _ALLOW.finditer(text) for p in _params_in(m.group(1), aliases)]
-    kept = [p for m in _KEEP.finditer(text) for p in _params_in(m.group(1), aliases)]
+    allowed, kept = [], [p for m in _KEEP.finditer(text) for p in _params_in(m.group(1), aliases)]
+    for m in _ALLOW.finditer(text):      # "change anything except the fin count": what follows "except" is kept
+        parts = _EXCEPT.split(m.group(1), maxsplit=1)
+        allowed += _params_in(parts[0], aliases)
+        kept += _params_in(parts[1], aliases) if len(parts) > 1 else []
     return list(dict.fromkeys(allowed)), list(dict.fromkeys(kept))
 
 
@@ -129,7 +134,7 @@ def to_goal(data: Dict[str, Any], text: str, space: DesignSpace, catalog: List[M
     for f in data.get("fixed_params", []):
         # A pin needs a value the user actually stated ("3 fins"). "Keep the endplates" means hold them
         # at their current value, so an invented value is dropped (Sat 15:40: Haiku pinned 300 mm).
-        stated = (not unverified_numbers(str(f["value"]), text)) if re.search(r"\d", str(f["value"])) \
+        stated = (not unverified_numbers(str(f["value"]), text, small_ints_ok=False)) if re.search(r"\d", str(f["value"])) \
             else str(f["value"]).lower() in text.lower()
         if stated:
             fixed[f["name"]] = _cast(space, f["name"], str(f["value"]))
@@ -207,7 +212,11 @@ def _validate(d: Dict[str, Any], text: str, space: DesignSpace, catalog: List[Me
 
 
 def parse_goal(text: str, space: DesignSpace, catalog: List[MetricInfo], presets: List[Preset],
-               budget: Optional[llm.RunLLMBudget] = None) -> Tuple[Goal, Optional[ModelResult]]:
+               budget: Optional[llm.RunLLMBudget] = None,
+               current: Optional[Dict[str, float]] = None,
+               current_params: Optional[Dict[str, Any]] = None) -> Tuple[Goal, Optional[ModelResult]]:
+    """`current` = the design's metrics now, so relative requests ("25% lighter") become absolute limits;
+    `current_params` = its parameter values now, so "keep X" is never read as some other value."""
     verdict = {}  # type: Dict[str, Any]
     keys = getattr(_packs.get(space.id), "goal_context_keys", None)     # None = the whole context
     block = {"text": text,
@@ -216,6 +225,10 @@ def parse_goal(text: str, space: DesignSpace, catalog: List[MetricInfo], presets
              "params": compact_specs(space),
              "context": {k: v for k, v in space.context.items()
                          if keys is None or k in keys}}
+    if current_params:
+        block["current_params"] = dict(current_params)
+    if current:
+        block["current_metrics"] = {m.name: round(float(current[m.name]), 4) for m in catalog if m.name in current}
     try:
         res = llm.call_model("goal_parser", system_prompt("goal_parser", space),
                              user_message("Parse this goal.", block), goal_schema(space, catalog),

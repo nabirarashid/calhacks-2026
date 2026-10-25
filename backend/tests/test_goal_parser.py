@@ -158,3 +158,48 @@ def test_no_llm_fallback_refuses_requests_about_other_physics(monkeypatch):
         parse_goal(STRUCTURAL, space, w.catalog(space.scorer), w.presets)
     g, _ = parse_goal("More downforce under 14 N of drag.", space, w.catalog(space.scorer), w.presets)
     assert g.parsed_by == "fallback"                                    # aero requests still work without the LLM
+
+
+def test_parser_sees_current_metrics_for_relative_requests(monkeypatch):
+    from backend import llm
+    from backend.agents import goal_parser
+    from backend.wiring import Wiring
+    space = _wing()
+    seen = []
+
+    def fake_call(role, system, user, schema, **kw):
+        seen.append((system, user))
+        raise llm.LLMUnavailable("test")
+    monkeypatch.setattr(llm, "call_model", fake_call)
+    w = Wiring()
+    goal_parser.parse_goal("Cut drag by 10% and keep the downforce", space, w.catalog(space.scorer), w.presets,
+                           current={"drag_n": 12.5, "downforce_n": 110.0})
+    system, user = seen[0]
+    assert '"current_metrics"' in user and "12.5" in user and "Relative requests" in system
+
+
+@pytest.mark.parametrize("text,editable", [
+    ("You can change anything except the fin count.", ["root_chord", "taper_ratio", "semi_span", "sweep_deg",
+                                                       "thickness", "edge_profile"]),
+    ("You may adjust the sweep and span but not the thickness.", ["semi_span", "sweep_deg"]),
+    ("Feel free to change everything other than the root chord and taper.", ["semi_span", "sweep_deg", "thickness",
+                                                                             "edge_profile", "fin_count"]),
+])
+def test_except_phrases_hold_the_named_params(text, editable):
+    from backend.agents.goal_parser import resolve_editable
+    from backend.wiring import Wiring
+    space = Wiring().resolve("fin_reference")
+    got, _ = resolve_editable(text, space, None, {})
+    assert got == editable
+
+
+def test_small_integer_pins_need_the_users_words():
+    # Live, Sat 18:41: DeepSeek pinned fin_count = 3 ("keeping the current fin count of 3") on a 4-fin rocket.
+    from backend.wiring import Wiring
+    w = Wiring()
+    space = w.resolve("fin_reference")
+    cat = w.catalog(space.scorer)
+    data = {"objectives": [{"metric": "drag_n", "direction": "minimize", "weight": 1}], "constraints": [],
+            "fixed_params": [{"name": "fin_count", "value": "3"}], "editable": [], "unsupported": [], "assumptions": []}
+    assert to_goal(data, "Cut drag. You can change anything except the fin count.", space, cat).fixed_params == {}
+    assert to_goal(data, "Cut drag with 3 fins.", space, cat).fixed_params == {"fin_count": 3}
