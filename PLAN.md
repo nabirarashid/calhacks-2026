@@ -355,6 +355,21 @@ source: Anderson, Fundamentals of Aerodynamics, ch. 5 (lifting-line theory)
 - The rocket-fin principles live in the same file.
 - **Ablation:** `DARWIN_KNOWLEDGE=off` drops the file from the prompt (used by the proof bench).
 
+**Coverage and verification (W-B, Sat 23:40).** Details: `domains/aero/README.md`.
+- **34 principles:** 18 rear wing, 9 rocket fin, 7 general. Planner payload (id + statement +
+  effects + levers) is about 3.0k tokens. Every lever of both parts has at least one principle.
+- **Verified against the solver, not just cited.** 29 carry a `check:` line (start state + one
+  lever step). `sim/tests/test_principles.py` runs each step on the real solver and asserts every
+  claimed direction and strength band. It also enforces 25-35 principles, at most 7 unchecked,
+  real lever and metric names, a source on each, and part tags that match the levers. Numbers in
+  statements are either from a cited source or measured on our solver ("in this model").
+- **Scope: lifting surfaces only** (rear wing, rocket fin, general lifting-surface physics).
+  Ground effect, car bodies, diffusers and CFD-only effects are out because the solver models
+  none of them, so a principle about them would make the agent predict changes it cannot see
+  (`P-NO-GROUND-EFFECT` says so to the agent).
+- **Ids are stable.** Never rename or delete one: recordings in `demo/` cite them and replays
+  would break. Text, effects and check lines may change.
+
 ### B.9 Models and budgets
 
 > **16:05 BLOCKER: the Anthropic API refuses every call** ("You have reached your specified API usage

@@ -110,6 +110,12 @@ Chrome side panel  <---- REST + WebSocket ---->  FastAPI investigator
 - `demo/` — recordings and benchmark outputs used as presentation evidence.
 - `docs/` — direction, physics notes, pitch, Devpost copy, and demo script.
 
+## Knowledge layer
+
+The investigator plans from 34 cited aerodynamic principles in `domains/aero/principles.md`.
+Each principle's claimed effects are also checked against the solver by
+`sim/tests/test_principles.py`. See [`domains/aero/README.md`](domains/aero/README.md).
+
 ## Verification
 
 ```bash
