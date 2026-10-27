@@ -10,6 +10,11 @@
   box-sizing: border-box;
 }
 
+/* .status sets display: grid, which would otherwise override the hidden attribute */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body,
 .panel {
