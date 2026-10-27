@@ -70,6 +70,21 @@ function AccuracySparkline({ values }: { values: number[] }) {
   );
 }
 
+/** Predicted band vs measured value on a symmetric % scale centred on zero. */
+function RangeBar({ low, high, actual, tone }: { low: number; high: number; actual?: number; tone: string }) {
+  const extent = Math.max(Math.abs(low), Math.abs(high), Math.abs(actual ?? 0), 5) * 1.15;
+  const x = (value: number) => 50 + (value / extent) * 50;
+  const left = x(Math.min(low, high));
+  const width = Math.max(x(Math.max(low, high)) - left, 1.2);
+  return (
+    <span className="range-bar" aria-hidden="true">
+      <i className="range-zero" />
+      <i className="range-band" style={{ left: `${left}%`, width: `${width}%` }} />
+      {actual === undefined ? null : <i className={`range-dot ${tone}`} style={{ left: `${x(actual)}%` }} />}
+    </span>
+  );
+}
+
 function StepCard({ run, step }: { run: RunFoldState; step: number }) {
   const plan = run.hypotheses.find((item) => item.step === step);
   const result = run.stepResults.find((item) => item.step === step);
@@ -77,11 +92,11 @@ function StepCard({ run, step }: { run: RunFoldState; step: number }) {
   const best = result ? run.designsById[result.best_id] : null;
   return (
     <article className={`step-card ${result ? `step-${result.verdict}` : 'step-running'}`}>
-      <div className="step-rail"><span>{step}</span><i /></div>
+      <div className="step-rail"><span>{String(step).padStart(2, '0')}</span><i /></div>
       <div className="step-body">
         <header>
           <div><span className="step-kicker">Hypothesis {step}</span><h2>{plan.levers.map(label).join(' + ')}</h2></div>
-          <span className={`verdict verdict-${result?.verdict ?? 'testing'}`}>{result?.verdict ?? 'testing'}</span>
+          <span className={`verdict verdict-${result?.verdict ?? 'testing'}`}><i />{result?.verdict ?? 'testing'}</span>
         </header>
         <p className="hypothesis">{withRedactions(plan.rationale)}</p>
         <div className="principles">
@@ -89,14 +104,15 @@ function StepCard({ run, step }: { run: RunFoldState; step: number }) {
           {plan.source === 'rules' ? ' · rules fallback' : null}
         </div>
         <div className="prediction-table">
-          <div className="prediction-heading"><span>Metric</span><span>Predicted</span><span title="✓ within the predicted range · ~ right direction · ✗ missed">Measured</span></div>
+          <div className="prediction-heading"><span>Prediction</span><span><i className="key-band" />predicted <i className="key-dot" />measured</span></div>
           {plan.predictions.map((prediction) => {
             const check = result?.checks.find((item) => item.metric === prediction.metric);
+            const tone = check ? check.in_range ? 'accurate' : check.direction_ok ? 'close' : 'miss' : '';
             return (
               <div className="prediction-row" key={prediction.metric}>
-                <span className="metric-name">{metricLabel(prediction.metric)}</span>
-                <span className="predicted">{signed(prediction.pct_low).replace('%', '')} to {signed(prediction.pct_high)}</span>
-                <span className={check ? check.in_range ? 'actual accurate' : check.direction_ok ? 'actual close' : 'actual miss' : 'actual'}>{check ? <>{signed(check.actual_pct)}<i className="mark" title={check.in_range ? 'Within the predicted range' : check.direction_ok ? 'Right direction, outside the range' : 'Prediction missed'}>{check.in_range ? '✓' : check.direction_ok ? '~' : '✗'}</i></> : '…'}</span>
+                <span className="metric-name">{metricLabel(prediction.metric)}<small>{signed(prediction.pct_low).replace('%', '')} to {signed(prediction.pct_high)}</small></span>
+                <RangeBar low={prediction.pct_low} high={prediction.pct_high} actual={check?.actual_pct} tone={tone} />
+                <span className={`actual ${tone}`}>{check ? <>{signed(check.actual_pct)}<i className="mark" title={check.in_range ? 'Within the predicted range' : check.direction_ok ? 'Right direction, outside the range' : 'Prediction missed'}>{check.in_range ? '✓' : check.direction_ok ? '~' : '✗'}</i></> : '…'}</span>
               </div>
             );
           })}
@@ -200,7 +216,9 @@ export default function PanelApp() {
   }, [docUrl, ingestMany, initialRunId, reset, setActiveRun, setSourceStatus]);
 
   const editable = sessionScope?.editable ?? activeRun?.summary?.goal.editable ?? [];
-  const fixed = sessionScope?.fixed ?? inspection?.params.filter((param) => !editable.includes(param.name)).map((param) => param.name) ?? [];
+  const paramNames = inspection?.params.map((param) => param.name) ?? activeRun?.designSpace?.parameters.map((param) => param.name) ?? [];
+  const fixed = sessionScope?.fixed ?? paramNames.filter((name) => !editable.includes(name));
+  const scoped = editable.length > 0;
   const steps = activeRun?.hypotheses.map((item) => item.step) ?? [];
   const running = activeRun?.status === 'running';
 
@@ -224,13 +242,18 @@ export default function PanelApp() {
 
   return (
     <div className="panel-app">
-      <header className="panel-header"><div className="darwin-glyph">D</div><div><strong>Darwin</strong><span>Aerodynamic design agent</span></div><div className={`panel-status status-${running ? 'live' : 'ready'}`}><i />{running ? sourceStatus : activeRun ? 'complete' : 'ready'}</div></header>
+      <header className="panel-header"><div className="darwin-glyph" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M4 18.5C9 12 19 10.5 28 14.5C20 15.5 11 17.5 4 18.5Z" /><path d="M4 18.5L28 14.5" className="chord" /></svg></div><div><strong>Darwin</strong><span>Aerodynamic design agent</span></div><div className={`panel-status status-${running ? 'live' : 'ready'}`}><i />{running ? sourceStatus : activeRun ? 'complete' : 'ready'}</div></header>
       <main>
         <section className="prompt-card">
           <label htmlFor="design-goal">Design goal</label>
           <textarea id="design-goal" value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={4} disabled={running} />
-          <div className="scope-block"><span>Can change</span><div>{editable.map((item) => <b key={item}>{label(item)}</b>)}</div></div>
-          <div className="scope-block keep"><span>Fixed</span><div>{fixed.map((item) => <b key={item}>{label(item)}</b>)}<b>mounts</b><b>airfoil</b></div></div>
+          {scoped ? <>
+            <div className="scope-block"><span>Can change</span><div>{editable.map((item) => <b key={item}>{label(item)}</b>)}</div></div>
+            {fixed.length ? <div className="scope-block keep"><span>Fixed</span><div>{fixed.map((item) => <b key={item}>{label(item)}</b>)}</div></div> : null}
+          </> : inspection ? <div className="param-list">
+            <span>Read from Onshape</span>
+            {inspection.params.map((param) => <div key={param.name}><span>{label(param.name)}</span><b className="num">{typeof param.value === 'number' ? Number(param.value.toFixed(3)) : String(param.value)} {param.unit === 'frac' ? '' : param.unit}</b></div>)}
+          </div> : null}
           {running ? <button className="panel-button stop" type="button" onClick={() => void stop()} disabled={busy}>Stop after this step</button> : <button className="panel-button" type="button" onClick={() => void start()} disabled={busy || !prompt.trim()}>{busy ? 'Starting…' : activeRun ? 'Run again' : 'Start'}</button>}
         </section>
 
