@@ -167,6 +167,8 @@ export default function PanelApp() {
   const explicitDoc = query.get('doc');
   const docUrl = explicitDoc ?? 'mock://rear-wing';
   const initialRunId = query.get('session') ?? query.get('run_id') ?? (!explicitDoc ? 'session_fixture_wing' : null);
+  // Each step is two model calls (~15 s), so a recorded demo runs 5 steps; ?steps=8 restores the full budget.
+  const maxSteps = Math.min(Math.max(Number(query.get('steps')) || 5, 1), 12);
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
   const [inspection, setInspection] = useState<InspectResponse | null>(null);
   const [sessionScope, setSessionScope] = useState<Pick<StartSessionResponse, 'editable' | 'fixed'> | null>(null);
@@ -225,7 +227,7 @@ export default function PanelApp() {
   const start = async () => {
     setBusy(true); setError(null);
     try {
-      const session = await api.startSession({ doc_url: docUrl, prompt, max_sims: 20, max_steps: 8 });
+      const session = await api.startSession({ doc_url: docUrl, prompt, max_sims: 20, max_steps: maxSteps });
       setSessionScope(session);
       subscribe(wsSource(session.run_id));
     } catch (reason) {
