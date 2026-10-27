@@ -13,14 +13,36 @@ import type { RunFoldState } from '@/store/reducer';
 
 const DEFAULT_PROMPT = 'More downforce without going over 15 N of drag at 25 m/s. You can change the angle, span, flap and endplates. Keep the chord.';
 
+const PARAM_NAMES: Record<string, string> = {
+  aoa_deg: 'Angle of attack', span_mm: 'Span', chord_mm: 'Chord', flap_angle_deg: 'Flap angle',
+  flap_chord_frac: 'Flap chord', endplate_height_mm: 'Endplate height',
+};
+
 function label(value: string) {
-  return value.replace(/_(deg|mm|frac|n)$/, '').replaceAll('_', ' ');
+  const name = PARAM_NAMES[value] ?? value.replace(/_(deg|mm|frac|n)$/, '').replaceAll('_', ' ');
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+function lower(value: string) {
+  return label(value).toLowerCase();
+}
+
+/** The investigator replaces numbers it can't trace to simulation data with [?]; show that plainly. */
+function withRedactions(text: string) {
+  return text.split(/(~?\[\?\]%?)/).map((part, index) => /^~?\[\?\]%?$/.test(part)
+    ? <span key={index} className="redacted" title="Removed: not backed by simulation data">unverified</span>
+    : part);
+}
+
+function principleName(id: string) {
+  return id.replace(/^P-/, '').toLowerCase();
 }
 
 function metricLabel(value: string) {
   const names: Record<string, string> = {
     downforce_n: 'Downforce', drag_n: 'Drag', l_over_d: 'L/D', drag_induced_n: 'Induced drag',
     drag_profile_n: 'Profile drag', stall_margin_deg: 'Stall margin', span_efficiency: 'Span efficiency',
+    cl: 'Lift coefficient',
   };
   return names[value] ?? label(value);
 }
@@ -61,28 +83,28 @@ function StepCard({ run, step }: { run: RunFoldState; step: number }) {
           <div><span className="step-kicker">Hypothesis {step}</span><h2>{plan.levers.map(label).join(' + ')}</h2></div>
           <span className={`verdict verdict-${result?.verdict ?? 'testing'}`}>{result?.verdict ?? 'testing'}</span>
         </header>
-        <p className="hypothesis">{plan.rationale}</p>
+        <p className="hypothesis">{withRedactions(plan.rationale)}</p>
         <div className="principles">
-          {(plan.principle_ids.length ? plan.principle_ids : ['Exploratory']).map((id) => <span key={id}>{id}</span>)}
-          {plan.source === 'rules' ? <span>rules fallback</span> : null}
+          {plan.principle_ids.length ? <>Based on <b>{plan.principle_ids.map(principleName).join(', ')}</b></> : 'Exploratory step'}
+          {plan.source === 'rules' ? ' · rules fallback' : null}
         </div>
         <div className="prediction-table">
-          <div className="prediction-heading"><span>Prediction</span><span>Actual</span></div>
+          <div className="prediction-heading"><span>Metric</span><span>Predicted</span><span title="✓ within the predicted range · ~ right direction · ✗ missed">Measured</span></div>
           {plan.predictions.map((prediction) => {
             const check = result?.checks.find((item) => item.metric === prediction.metric);
             return (
               <div className="prediction-row" key={prediction.metric}>
                 <span className="metric-name">{metricLabel(prediction.metric)}</span>
-                <span className="predicted">{prediction.direction === 'up' ? '↑' : prediction.direction === 'down' ? '↓' : '→'} {signed(prediction.pct_low)} to {signed(prediction.pct_high)}</span>
-                <span className={check ? check.in_range ? 'actual accurate' : check.direction_ok ? 'actual close' : 'actual miss' : 'actual'}>{check ? signed(check.actual_pct) : 'running…'}</span>
+                <span className="predicted">{signed(prediction.pct_low).replace('%', '')} to {signed(prediction.pct_high)}</span>
+                <span className={check ? check.in_range ? 'actual accurate' : check.direction_ok ? 'actual close' : 'actual miss' : 'actual'}>{check ? <>{signed(check.actual_pct)}<i className="mark" title={check.in_range ? 'Within the predicted range' : check.direction_ok ? 'Right direction, outside the range' : 'Prediction missed'}>{check.in_range ? '✓' : check.direction_ok ? '~' : '✗'}</i></> : '…'}</span>
               </div>
             );
           })}
         </div>
-        {best && result ? <div className="result-strip"><span>{best.params[plan.levers[0]]} {run.designSpace?.parameters.find((item) => item.name === plan.levers[0])?.unit}</span><span>{best.score.metrics.downforce_n?.toFixed(1)} N downforce</span><span>{best.score.metrics.drag_n?.toFixed(1)} N drag</span></div> : null}
+        {best && result ? <div className="result-strip">Best tested: {plan.levers.map((lever) => `${lower(lever)} ${best.params[lever]} ${run.designSpace?.parameters.find((item) => item.name === lever)?.unit ?? ''}`.trim()).join(', ')} · <b>{best.score.metrics.downforce_n?.toFixed(1)} N</b> downforce · <b>{best.score.metrics.drag_n?.toFixed(1)} N</b> drag</div> : null}
         {result ? <>
-          <details className="explanation"><summary>Why this happened</summary><p>{result.explanation}</p></details>
-          <div className="lesson"><span>Learned</span>{result.lesson}</div>
+          <details className="explanation"><summary>Why this happened</summary><p>{withRedactions(result.explanation)}</p></details>
+          <div className="lesson"><span>Learned</span>{withRedactions(result.lesson)}</div>
         </> : <div className="simulating"><i />Testing {plan.candidates.length} design{plan.candidates.length === 1 ? '' : 's'}…</div>}
       </div>
     </article>
@@ -93,11 +115,11 @@ function NotebookDrawer({ run }: { run: RunFoldState }) {
   const notebook = run.notebook;
   return (
     <details className="notebook-drawer">
-      <summary><span><b>Lab notebook</b><small>{notebook.beliefs.length} beliefs · {notebook.ruled_out.length} ruled out</small></span><span>Open</span></summary>
+      <summary><span><b>Lab notebook</b><small>{notebook.beliefs.length} lessons · {notebook.ruled_out.length} ruled out</small></span><span>Show</span></summary>
       <div className="notebook-content">
-        <section><h3>Beliefs</h3>{notebook.beliefs.length ? notebook.beliefs.map((belief, index) => <p key={`${index}-${belief.text}`}><b>{belief.evidence_steps.join(', ')}</b>{belief.text}</p>) : <em>No observations yet.</em>}</section>
+        <section><h3>Lessons</h3>{notebook.beliefs.length ? notebook.beliefs.map((belief, index) => <p key={`${index}-${belief.text}`}><b>{belief.evidence_steps.join(', ')}</b><span>{withRedactions(belief.text)}</span></p>) : <em>No observations yet.</em>}</section>
         <section><h3>Measured lever effects</h3>{Object.entries(notebook.lever_effects).map(([lever, effects]) => <div className="lever-effect" key={lever}><b>{label(lever)}</b><span>{Object.entries(effects).map(([metric, value]) => `${metricLabel(metric)} ${value > 0 ? '+' : ''}${value.toFixed(2)}`).join(' · ')}</span></div>)}</section>
-        {notebook.ruled_out.length ? <section><h3>Ruled out</h3>{notebook.ruled_out.map((item) => <p key={item}>× {item}</p>)}</section> : null}
+        {notebook.ruled_out.length ? <section><h3>Ruled out</h3>{notebook.ruled_out.map((item) => <p key={item}><b>×</b><span>{label(item)}</span></p>)}</section> : null}
       </div>
     </details>
   );
@@ -113,7 +135,7 @@ function FinalSummary({ run }: { run: RunFoldState }) {
   return (
     <section className="final-summary">
       <div className="final-check">✓</div><div className="step-kicker">Investigation complete</div>
-      <h2>{signed(downforce)} downforce</h2><p>while drag changed {signed(drag)}</p>
+      <h2>{signed(downforce)} downforce</h2><p>Drag changed {signed(drag)}</p>
       <div className="before-after">
         <div><span>Before</span><strong>{before.score.metrics.downforce_n.toFixed(1)} N</strong><small>{before.score.metrics.drag_n.toFixed(1)} N drag</small></div>
         <i>→</i>
@@ -202,14 +224,14 @@ export default function PanelApp() {
 
   return (
     <div className="panel-app">
-      <header className="panel-header"><div className="darwin-glyph">D</div><div><strong>DARWIN</strong><span>Aerodynamic reasoning agent</span></div><div className={`panel-status status-${running ? 'live' : 'ready'}`}><i />{running ? sourceStatus : activeRun ? 'complete' : 'ready'}</div></header>
+      <header className="panel-header"><div className="darwin-glyph">D</div><div><strong>Darwin</strong><span>Aerodynamic design agent</span></div><div className={`panel-status status-${running ? 'live' : 'ready'}`}><i />{running ? sourceStatus : activeRun ? 'complete' : 'ready'}</div></header>
       <main>
         <section className="prompt-card">
-          <label htmlFor="design-goal">What should I improve?</label>
+          <label htmlFor="design-goal">Design goal</label>
           <textarea id="design-goal" value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={4} disabled={running} />
-          <div className="scope-block"><span>Will change</span><div>{editable.map((item) => <b key={item}>{label(item)}</b>)}</div></div>
-          <div className="scope-block keep"><span>Will keep</span><div>{fixed.map((item) => <b key={item}>{label(item)}</b>)}<b>mounts</b><b>airfoil</b></div></div>
-          {running ? <button className="panel-button stop" type="button" onClick={() => void stop()} disabled={busy}>Stop after this step</button> : <button className="panel-button" type="button" onClick={() => void start()} disabled={busy || !prompt.trim()}>{busy ? 'Starting…' : activeRun ? 'Run again' : 'Start investigation'}</button>}
+          <div className="scope-block"><span>Can change</span><div>{editable.map((item) => <b key={item}>{label(item)}</b>)}</div></div>
+          <div className="scope-block keep"><span>Fixed</span><div>{fixed.map((item) => <b key={item}>{label(item)}</b>)}<b>mounts</b><b>airfoil</b></div></div>
+          {running ? <button className="panel-button stop" type="button" onClick={() => void stop()} disabled={busy}>Stop after this step</button> : <button className="panel-button" type="button" onClick={() => void start()} disabled={busy || !prompt.trim()}>{busy ? 'Starting…' : activeRun ? 'Run again' : 'Start'}</button>}
         </section>
 
         {error ? <div className="panel-error" role="alert">{error}</div> : null}
@@ -217,11 +239,11 @@ export default function PanelApp() {
           <AccuracySparkline values={activeRun.notebook.accuracy} />
           <section className="timeline" aria-label="Investigation steps">
             {steps.map((step) => <StepCard key={step} run={activeRun} step={step} />)}
-            {!steps.length ? <div className="panel-empty">Reading the model and establishing a baseline…</div> : null}
+            {!steps.length ? <div className="panel-empty">Reading the model and simulating the baseline…</div> : null}
           </section>
           <FinalSummary run={activeRun} />
           <NotebookDrawer run={activeRun} />
-        </> : <div className="panel-empty">Inspecting the wing…</div>}
+        </> : <div className="panel-empty">Reading the wing from Onshape…</div>}
       </main>
     </div>
   );
