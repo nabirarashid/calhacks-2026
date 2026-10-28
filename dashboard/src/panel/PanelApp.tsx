@@ -23,10 +23,6 @@ function label(value: string) {
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
-function lower(value: string) {
-  return label(value).toLowerCase();
-}
-
 /** The investigator replaces numbers it can't trace to simulation data with [?]; show that plainly. */
 function withRedactions(text: string) {
   return text.split(/(~?\[\?\]%?)/).map((part, index) => /^~?\[\?\]%?$/.test(part)
@@ -34,9 +30,7 @@ function withRedactions(text: string) {
     : part);
 }
 
-function principleName(id: string) {
-  return id.replace(/^P-/, '').toLowerCase();
-}
+
 
 function metricLabel(value: string) {
   const names: Record<string, string> = {
@@ -70,14 +64,42 @@ function AccuracySparkline({ values }: { values: number[] }) {
   );
 }
 
-/** Predicted band vs measured value on a symmetric % scale centred on zero. */
-function RangeBar({ low, high, actual, tone }: { low: number; high: number; actual?: number; tone: string }) {
-  const extent = Math.max(Math.abs(low), Math.abs(high), Math.abs(actual ?? 0), 5) * 1.15;
-  const x = (value: number) => 50 + (value / extent) * 50;
+const PRINCIPLE_NAMES: Record<string, string> = {
+  'P-Q-SCALING': 'Speed scaling', 'P-AOA-LIFT': 'AoA vs lift', 'P-SECTION-CLMAX': 'Section CL max', 'P-STALL': 'Stall',
+  'P-STALL-MARGIN-LEVERS': 'Stall margin', 'P-FLAP-STALL-ANGLE': 'Flap stall angle', 'P-CAMBER-ZERO-LIFT': 'Camber',
+  'P-LOW-AR-SLOPE': 'Low-AR lift slope', 'P-FLAP-CAMBER': 'Flap camber', 'P-FLAP-SATURATION': 'Flap saturation',
+  'P-FLAP-TRIM': 'Flap trim', 'P-FLAP-CHORD': 'Flap chord', 'P-FLAP-CHORD-OPTIMUM': 'Flap chord optimum',
+  'P-PLAIN-VS-SLOTTED': 'Plain vs slotted flap', 'P-INDUCED-AR': 'Induced drag vs AR', 'P-SPAN-AREA-AR': 'Span, area & AR',
+  'P-CHORD-AREA-AR': 'Chord, area & AR', 'P-INDUCED-QUADRATIC': 'Induced drag ∝ CL²', 'P-SPAN-EFFICIENCY': 'Span efficiency',
+  'P-ENDPLATE-AR': 'Endplates & AR', 'P-SKIN-FRICTION': 'Skin friction', 'P-PROFILE-LOADING': 'Profile drag',
+  'P-REYNOLDS-CHORD': 'Reynolds number', 'P-LD-TRADEOFF': 'L/D trade-off', 'P-NO-GROUND-EFFECT': 'No ground effect',
+};
+
+function principleName(id: string) {
+  if (PRINCIPLE_NAMES[id]) return PRINCIPLE_NAMES[id];
+  const words = id.replace(/^P-/, '').toLowerCase().replaceAll('-', ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+const SHORT_PARAM: Record<string, string> = {
+  aoa_deg: 'AoA', span_mm: 'Span', chord_mm: 'Chord', flap_angle_deg: 'Flap angle',
+  flap_chord_frac: 'Flap chord', endplate_height_mm: 'Endplate',
+};
+
+/** Predicted ranges are coarse, so whole numbers; measured changes keep one decimal. */
+function pct(value: number, digits: number) {
+  const fixed = value.toFixed(digits);
+  return `${value > 0 && Number(fixed) !== 0 ? '+' : ''}${Number(fixed) === 0 ? (0).toFixed(digits) : fixed}`;
+}
+
+/** Predicted band vs measured value; every row in a card shares one symmetric scale centred on zero. */
+function RangeBar({ low, high, actual, tone, extent }: { low: number; high: number; actual?: number; tone: string; extent: number }) {
+  const x = (value: number) => 50 + (value / extent) * 46;
   const left = x(Math.min(low, high));
-  const width = Math.max(x(Math.max(low, high)) - left, 1.2);
+  const width = Math.max(x(Math.max(low, high)) - left, 1.5);
   return (
     <span className="range-bar" aria-hidden="true">
+      <i className="range-axis" />
       <i className="range-zero" />
       <i className="range-band" style={{ left: `${left}%`, width: `${width}%` }} />
       {actual === undefined ? null : <i className={`range-dot ${tone}`} style={{ left: `${x(actual)}%` }} />}
@@ -85,39 +107,58 @@ function RangeBar({ low, high, actual, tone }: { low: number; high: number; actu
   );
 }
 
+const STATUS_TEXT: Record<string, string> = { accurate: 'in range', close: 'close', miss: 'outside' };
+
 function StepCard({ run, step }: { run: RunFoldState; step: number }) {
   const plan = run.hypotheses.find((item) => item.step === step);
   const result = run.stepResults.find((item) => item.step === step);
   if (!plan) return null;
   const best = result ? run.designsById[result.best_id] : null;
+  const verdict = result?.verdict ?? 'testing';
+  const checks = plan.predictions.map((prediction) => result?.checks.find((item) => item.metric === prediction.metric));
+  const extent = Math.max(5, ...plan.predictions.flatMap((p, i) => [Math.abs(p.pct_low), Math.abs(p.pct_high), Math.abs(checks[i]?.actual_pct ?? 0)])) * 1.05;
+  const unitOf = (name: string) => run.designSpace?.parameters.find((item) => item.name === name)?.unit ?? '';
   return (
-    <article className={`step-card ${result ? `step-${result.verdict}` : 'step-running'}`}>
+    <article className={`step-card step-${result ? verdict : 'running'}`}>
       <div className="step-rail"><span>{String(step).padStart(2, '0')}</span><i /></div>
       <div className="step-body">
         <header>
           <div><span className="step-kicker">Hypothesis {step}</span><h2>{plan.levers.map(label).join(' + ')}</h2></div>
-          <span className={`verdict verdict-${result?.verdict ?? 'testing'}`}><i />{result?.verdict ?? 'testing'}</span>
+          <span className={`verdict verdict-${verdict}`}>{verdict}</span>
         </header>
         <p className="hypothesis">{withRedactions(plan.rationale)}</p>
         <div className="principles">
-          {plan.principle_ids.length ? <>Based on <b>{plan.principle_ids.map(principleName).join(', ')}</b></> : 'Exploratory step'}
-          {plan.source === 'rules' ? ' · rules fallback' : null}
+          {plan.principle_ids.length ? plan.principle_ids.map((id) => <span key={id} title={id}>{principleName(id)}</span>) : <span>Exploratory</span>}
+          {plan.source === 'rules' ? <span>Rules fallback</span> : null}
         </div>
         <div className="prediction-table">
-          <div className="prediction-heading"><span>Prediction</span><span><i className="key-band" />predicted <i className="key-dot" />measured</span></div>
-          {plan.predictions.map((prediction) => {
-            const check = result?.checks.find((item) => item.metric === prediction.metric);
+          <div className="prediction-heading"><span>Predicted change</span><span className="legend"><i className="key-band" />predicted<i className="key-dot" />measured</span></div>
+          {plan.predictions.map((prediction, index) => {
+            const check = checks[index];
             const tone = check ? check.in_range ? 'accurate' : check.direction_ok ? 'close' : 'miss' : '';
+            const lo = Math.min(prediction.pct_low, prediction.pct_high);
+            const hi = Math.max(prediction.pct_low, prediction.pct_high);
             return (
               <div className="prediction-row" key={prediction.metric}>
-                <span className="metric-name">{metricLabel(prediction.metric)}<small>{signed(prediction.pct_low).replace('%', '')} to {signed(prediction.pct_high)}</small></span>
-                <RangeBar low={prediction.pct_low} high={prediction.pct_high} actual={check?.actual_pct} tone={tone} />
-                <span className={`actual ${tone}`}>{check ? <>{signed(check.actual_pct)}<i className="mark" title={check.in_range ? 'Within the predicted range' : check.direction_ok ? 'Right direction, outside the range' : 'Prediction missed'}>{check.in_range ? '✓' : check.direction_ok ? '~' : '✗'}</i></> : '…'}</span>
+                <span className="metric-name">{metricLabel(prediction.metric)}<small className="num">{pct(lo, 0)} to {pct(hi, 0)}%</small></span>
+                <RangeBar low={lo} high={hi} actual={check?.actual_pct} tone={tone} extent={extent} />
+                <span className="actual">
+                  <b className="num">{check ? `${pct(check.actual_pct, 1)}%` : '—'}</b>
+                  {check ? <em className={`check-pill ${tone}`}>{STATUS_TEXT[tone]}</em> : <em className="check-pill pending">running</em>}
+                </span>
               </div>
             );
           })}
         </div>
-        {best && result ? <div className="result-strip">Best tested: {plan.levers.map((lever) => `${lower(lever)} ${best.params[lever]} ${run.designSpace?.parameters.find((item) => item.name === lever)?.unit ?? ''}`.trim()).join(', ')} · <b>{best.score.metrics.downforce_n?.toFixed(1)} N</b> downforce · <b>{best.score.metrics.drag_n?.toFixed(1)} N</b> drag</div> : null}
+        {best && result ? (
+          <dl className="stat-row">
+            {plan.levers.map((lever) => (
+              <div key={lever}><dt>{SHORT_PARAM[lever] ?? label(lever)}</dt><dd className="num">{Number(Number(best.params[lever]).toFixed(3))}<small>{unitOf(lever) === 'frac' ? '' : ` ${unitOf(lever)}`}</small></dd></div>
+            ))}
+            <div><dt>Downforce</dt><dd className="num">{best.score.metrics.downforce_n?.toFixed(1)}<small> N</small></dd></div>
+            <div><dt>Drag</dt><dd className="num">{best.score.metrics.drag_n?.toFixed(1)}<small> N</small></dd></div>
+          </dl>
+        ) : null}
         {result ? <>
           <details className="explanation"><summary>Why this happened</summary><p>{withRedactions(result.explanation)}</p></details>
           <div className="lesson"><span>Learned</span>{withRedactions(result.lesson)}</div>
@@ -134,7 +175,7 @@ function NotebookDrawer({ run }: { run: RunFoldState }) {
       <summary><span><b>Lab notebook</b><small>{notebook.beliefs.length} lessons · {notebook.ruled_out.length} ruled out</small></span><span>Show</span></summary>
       <div className="notebook-content">
         <section><h3>Lessons</h3>{notebook.beliefs.length ? notebook.beliefs.map((belief, index) => <p key={`${index}-${belief.text}`}><b>{belief.evidence_steps.join(', ')}</b><span>{withRedactions(belief.text)}</span></p>) : <em>No observations yet.</em>}</section>
-        <section><h3>Measured lever effects</h3>{Object.entries(notebook.lever_effects).map(([lever, effects]) => <div className="lever-effect" key={lever}><b>{label(lever)}</b><span>{Object.entries(effects).map(([metric, value]) => `${metricLabel(metric)} ${value > 0 ? '+' : ''}${value.toFixed(2)}`).join(' · ')}</span></div>)}</section>
+        <section><h3>Measured lever effects</h3>{Object.entries(notebook.lever_effects).map(([lever, effects]) => <div className="lever-effect" key={lever}><b>{label(lever)}</b><span>{Object.entries(effects).map(([metric, value]) => <span key={metric}>{metricLabel(metric)} <span className="num">{value > 0 ? '+' : ''}{value.toFixed(2)}</span></span>)}</span></div>)}</section>
         {notebook.ruled_out.length ? <section><h3>Ruled out</h3>{notebook.ruled_out.map((item) => <p key={item}><b>×</b><span>{label(item)}</span></p>)}</section> : null}
       </div>
     </details>
@@ -151,11 +192,11 @@ function FinalSummary({ run }: { run: RunFoldState }) {
   return (
     <section className="final-summary">
       <div className="final-check">✓</div><div className="step-kicker">Investigation complete</div>
-      <h2>{signed(downforce)} downforce</h2><p>Drag changed {signed(drag)}</p>
+      <h2><span className="num">{signed(downforce)}</span> downforce</h2><p>Drag changed <span className="num">{signed(drag)}</span></p>
       <div className="before-after">
-        <div><span>Before</span><strong>{before.score.metrics.downforce_n.toFixed(1)} N</strong><small>{before.score.metrics.drag_n.toFixed(1)} N drag</small></div>
+        <div><span>Before</span><strong className="num">{before.score.metrics.downforce_n.toFixed(1)} N</strong><small><span className="num">{before.score.metrics.drag_n.toFixed(1)} N</span> drag</small></div>
         <i>→</i>
-        <div><span>After</span><strong>{after.score.metrics.downforce_n.toFixed(1)} N</strong><small>{after.score.metrics.drag_n.toFixed(1)} N drag</small></div>
+        <div><span>After</span><strong className="num">{after.score.metrics.downforce_n.toFixed(1)} N</strong><small><span className="num">{after.score.metrics.drag_n.toFixed(1)} N</span> drag</small></div>
       </div>
       {finalVersion ? <div className="version-chip">Onshape version · {finalVersion}</div> : null}
     </section>
